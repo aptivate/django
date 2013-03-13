@@ -21,12 +21,15 @@ env:
   - DB=postgres GIS=nogis
   - DB=postgres GIS=gis
 
+install:
+  - pip install -e .
+
 before_script:
   - export PIP_USE_MIRRORS=true
   - export PIP_INDEX_URL=https://restricted.crate.io/
   - export DISPLAY=:99.0
   - export CONFIG_SERVER=http://apolloner.eu/~apollo13/django/
-  - wget -O before_script.sh $CONFIG_SERVER/before_script.sh && sh before_script.sh
+  - wget -O before_script.sh $CONFIG_SERVER/before_script.sh >/dev/null 2>&1 && sh before_script.sh
 
 script:
   - python -Wall tests/runtests.py --selenium --verbosity 2 --settings=django_settings
