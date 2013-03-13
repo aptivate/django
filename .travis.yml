@@ -34,5 +34,8 @@ before_script:
 script:
   - python -Wall tests/runtests.py --selenium --verbosity 2 --settings=django_settings
 
+services:
+  - memcached
+
 notifications:
   email: false
