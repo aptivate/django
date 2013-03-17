@@ -49,9 +49,10 @@ class Field(object):
     widget = TextInput # Default widget to use when rendering this type of Field.
     hidden_widget = HiddenInput # Default widget to use when rendering this as "hidden".
     default_validators = [] # Default set of validators
+    # Add an 'invalid' entry to default_error_message if you want a specific
+    # field error message not raised by the field validators.
     default_error_messages = {
         'required': _('This field is required.'),
-        'invalid': _('Enter a valid value.'),
     }
     empty_values = list(validators.EMPTY_VALUES)
 
@@ -225,8 +226,6 @@ class CharField(Field):
 class IntegerField(Field):
     default_error_messages = {
         'invalid': _('Enter a whole number.'),
-        'max_value': _('Ensure this value is less than or equal to %(limit_value)s.'),
-        'min_value': _('Ensure this value is greater than or equal to %(limit_value)s.'),
     }
 
     def __init__(self, max_value=None, min_value=None, *args, **kwargs):
@@ -504,9 +503,6 @@ class RegexField(CharField):
 
 class EmailField(CharField):
     widget = EmailInput
-    default_error_messages = {
-        'invalid': _('Enter a valid email address.'),
-    }
     default_validators = [validators.validate_email]
 
     def clean(self, value):
@@ -778,14 +774,15 @@ class ChoiceField(Field):
 
     def valid_value(self, value):
         "Check to see if the provided value is a valid choice"
+        text_value = force_text(value)
         for k, v in self.choices:
             if isinstance(v, (list, tuple)):
                 # This is an optgroup, so look inside the group for options
                 for k2, v2 in v:
-                    if value == smart_text(k2):
+                    if value == k2 or text_value == force_text(k2):
                         return True
             else:
-                if value == smart_text(k):
+                if value == k or text_value == force_text(k):
                     return True
         return False
 
@@ -801,7 +798,6 @@ class TypedChoiceField(ChoiceField):
         right type.
         """
         value = super(TypedChoiceField, self).to_python(value)
-        super(TypedChoiceField, self).validate(value)
         if value == self.empty_value or value in self.empty_values:
             return self.empty_value
         try:
@@ -809,9 +805,6 @@ class TypedChoiceField(ChoiceField):
         except (ValueError, TypeError, ValidationError):
             raise ValidationError(self.error_messages['invalid_choice'] % {'value': value})
         return value
-
-    def validate(self, value):
-        pass
 
 
 class MultipleChoiceField(ChoiceField):
@@ -864,7 +857,6 @@ class TypedMultipleChoiceField(MultipleChoiceField):
         right type.
         """
         value = super(TypedMultipleChoiceField, self).to_python(value)
-        super(TypedMultipleChoiceField, self).validate(value)
         if value == self.empty_value or value in self.empty_values:
             return self.empty_value
         new_value = []
@@ -876,7 +868,11 @@ class TypedMultipleChoiceField(MultipleChoiceField):
         return new_value
 
     def validate(self, value):
-        pass
+        if value != self.empty_value:
+            super(TypedMultipleChoiceField, self).validate(value)
+        elif self.required:
+            raise ValidationError(self.error_messages['required'])
+
 
 class ComboField(Field):
     """
@@ -1082,9 +1078,6 @@ class SplitDateTimeField(MultiValueField):
 
 
 class IPAddressField(CharField):
-    default_error_messages = {
-        'invalid': _('Enter a valid IPv4 address.'),
-    }
     default_validators = [validators.validate_ipv4_address]
 
     def to_python(self, value):
@@ -1094,13 +1087,9 @@ class IPAddressField(CharField):
 
 
 class GenericIPAddressField(CharField):
-    default_error_messages = {}
-
     def __init__(self, protocol='both', unpack_ipv4=False, *args, **kwargs):
         self.unpack_ipv4 = unpack_ipv4
-        self.default_validators, invalid_error_message = \
-            validators.ip_address_validators(protocol, unpack_ipv4)
-        self.default_error_messages['invalid'] = invalid_error_message
+        self.default_validators = validators.ip_address_validators(protocol, unpack_ipv4)[0]
         super(GenericIPAddressField, self).__init__(*args, **kwargs)
 
     def to_python(self, value):
@@ -1108,14 +1097,9 @@ class GenericIPAddressField(CharField):
             return ''
         value = value.strip()
         if value and ':' in value:
-            return clean_ipv6_address(value,
-                self.unpack_ipv4, self.error_messages['invalid'])
+            return clean_ipv6_address(value, self.unpack_ipv4)
         return value
 
 
 class SlugField(CharField):
-    default_error_messages = {
-        'invalid': _("Enter a valid 'slug' consisting of letters, numbers,"
-                     " underscores or hyphens."),
-    }
     default_validators = [validators.validate_slug]
