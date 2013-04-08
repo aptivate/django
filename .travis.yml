@@ -25,6 +25,7 @@ install:
   - pip install -e .
 
 before_script:
+  - locale
   - export PIP_USE_MIRRORS=true
   - export PIP_INDEX_URL=https://restricted.crate.io/
   - export DISPLAY=:99.0
