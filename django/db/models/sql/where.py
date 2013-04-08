@@ -4,7 +4,6 @@ Code to manage the creation and SQL rendering of 'where' constraints.
 
 from __future__ import absolute_import
 
-import collections
 import datetime
 from itertools import repeat
 
@@ -12,6 +11,7 @@ from django.conf import settings
 from django.db.models.fields import DateTimeField, Field
 from django.db.models.sql.datastructures import EmptyResultSet, Empty
 from django.db.models.sql.aggregates import Aggregate
+from django.utils.itercompat import is_iterator
 from django.utils.six.moves import xrange
 from django.utils import timezone
 from django.utils import tree
@@ -58,7 +58,7 @@ class WhereNode(tree.Node):
         if not isinstance(data, (list, tuple)):
             return data
         obj, lookup_type, value = data
-        if isinstance(value, collections.Iterator):
+        if is_iterator(value):
             # Consume any generators immediately, so that we can determine
             # emptiness and transform any non-empty values correctly.
             value = list(value)
@@ -382,3 +382,28 @@ class Constraint(object):
             new.__class__ = self.__class__
             new.alias, new.col, new.field = change_map[self.alias], self.col, self.field
             return new
+
+class SubqueryConstraint(object):
+    def __init__(self, alias, columns, targets, query_object):
+        self.alias = alias
+        self.columns = columns
+        self.targets = targets
+        self.query_object = query_object
+
+    def as_sql(self, qn, connection):
+        query = self.query_object
+
+        # QuerySet was sent
+        if hasattr(query, 'values'):
+            if query._db and connection.alias != query._db:
+                raise ValueError("Can't do subqueries with queries on different DBs.")
+            query = query.values(*self.targets).query
+            query.clear_ordering(True)
+
+        query_compiler = query.get_compiler(connection=connection)
+        return query_compiler.as_subquery_condition(self.alias, self.columns)
+
+    def relabeled_clone(self, relabels):
+        return self.__class__(
+            relabels.get(self.alias, self.alias),
+            self.columns, self.query_object)

@@ -8,6 +8,7 @@ import copy
 import datetime
 import os
 import re
+import sys
 try:
     from urllib.parse import urlsplit, urlunsplit
 except ImportError:     # Python 2
@@ -60,7 +61,7 @@ class Field(object):
     creation_counter = 0
 
     def __init__(self, required=True, widget=None, label=None, initial=None,
-                 help_text=None, error_messages=None, show_hidden_initial=False,
+                 help_text='', error_messages=None, show_hidden_initial=False,
                  validators=[], localize=False):
         # required -- Boolean that specifies whether the field is required.
         #             True by default.
@@ -81,14 +82,9 @@ class Field(object):
         #                        hidden widget with initial value after widget.
         # validators -- List of addtional validators to use
         # localize -- Boolean that specifies if the field should be localized.
-        if label is not None:
-            label = smart_text(label)
         self.required, self.label, self.initial = required, label, initial
         self.show_hidden_initial = show_hidden_initial
-        if help_text is None:
-            self.help_text = ''
-        else:
-            self.help_text = smart_text(help_text)
+        self.help_text = help_text
         widget = widget or self.widget
         if isinstance(widget, type):
             widget = widget()
@@ -119,6 +115,7 @@ class Field(object):
         self.error_messages = messages
 
         self.validators = self.default_validators + validators
+        super(Field, self).__init__()
 
     def prepare_value(self, value):
         return value
@@ -619,7 +616,7 @@ class ImageField(FileField):
             # raised. Catch and re-raise.
             raise
         except Exception: # Python Imaging Library doesn't recognize it as an image
-            raise ValidationError(self.error_messages['invalid_image'])
+            six.reraise(ValidationError, ValidationError(self.error_messages['invalid_image']), sys.exc_info()[2])
         if hasattr(f, 'seek') and callable(f.seek):
             f.seek(0)
         return f
@@ -737,7 +734,7 @@ class ChoiceField(Field):
     }
 
     def __init__(self, choices=(), required=True, widget=None, label=None,
-                 initial=None, help_text=None, *args, **kwargs):
+                 initial=None, help_text='', *args, **kwargs):
         super(ChoiceField, self).__init__(required=required, widget=widget, label=label,
                                         initial=initial, help_text=help_text, *args, **kwargs)
         self.choices = choices
@@ -997,7 +994,7 @@ class MultiValueField(Field):
 class FilePathField(ChoiceField):
     def __init__(self, path, match=None, recursive=False, allow_files=True,
                  allow_folders=False, required=True, widget=None, label=None,
-                 initial=None, help_text=None, *args, **kwargs):
+                 initial=None, help_text='', *args, **kwargs):
         self.path, self.match, self.recursive = path, match, recursive
         self.allow_files, self.allow_folders = allow_files, allow_folders
         super(FilePathField, self).__init__(choices=(), required=required,

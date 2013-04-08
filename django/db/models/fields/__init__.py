@@ -1,6 +1,5 @@
 from __future__ import unicode_literals
 
-import collections
 import copy
 import datetime
 import decimal
@@ -18,6 +17,7 @@ from django.core import exceptions, validators
 from django.utils.datastructures import DictWrapper
 from django.utils.dateparse import parse_date, parse_datetime, parse_time
 from django.utils.functional import curry, total_ordering
+from django.utils.itercompat import is_iterator
 from django.utils.text import capfirst
 from django.utils import timezone
 from django.utils.translation import ugettext_lazy as _
@@ -292,10 +292,13 @@ class Field(object):
         if self.verbose_name is None and self.name:
             self.verbose_name = self.name.replace('_', ' ')
 
-    def contribute_to_class(self, cls, name):
+    def contribute_to_class(self, cls, name, virtual_only=False):
         self.set_attributes_from_name(name)
         self.model = cls
-        cls._meta.add_field(self)
+        if virtual_only:
+            cls._meta.add_virtual_field(self)
+        else:
+            cls._meta.add_field(self)
         if self.choices:
             setattr(cls, 'get_%s_display' % self.name,
                     curry(cls._get_FIELD_display, field=self))
@@ -488,7 +491,7 @@ class Field(object):
         return bound_field_class(self, fieldmapping, original)
 
     def _get_choices(self):
-        if isinstance(self._choices, collections.Iterator):
+        if is_iterator(self._choices):
             choices, self._choices = tee(self._choices)
             return choices
         else:
@@ -620,8 +623,6 @@ class BooleanField(Field):
 
     def __init__(self, *args, **kwargs):
         kwargs['blank'] = True
-        if 'default' not in kwargs and not kwargs.get('null'):
-            kwargs['default'] = False
         Field.__init__(self, *args, **kwargs)
 
     def get_internal_type(self):

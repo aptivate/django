@@ -3,6 +3,7 @@
 from __future__ import absolute_import, unicode_literals
 
 import datetime
+from decimal import Decimal
 import threading
 
 from django.conf import settings
@@ -11,6 +12,7 @@ from django.db import (backend, connection, connections, DEFAULT_DB_ALIAS,
     DatabaseError, IntegrityError, transaction)
 from django.db.backends.signals import connection_created
 from django.db.backends.postgresql_psycopg2 import version as pg_version
+from django.db.backends.util import format_number
 from django.db.models import Sum, Avg, Variance, StdDev
 from django.db.utils import ConnectionHandler
 from django.test import (TestCase, skipUnlessDBFeature, skipIfDBFeature,
@@ -157,18 +159,18 @@ class DateQuotingTest(TestCase):
 class LastExecutedQueryTest(TestCase):
 
     def test_debug_sql(self):
-        list(models.Tag.objects.filter(name="test"))
+        list(models.Reporter.objects.filter(first_name="test"))
         sql = connection.queries[-1]['sql'].lower()
         self.assertIn("select", sql)
-        self.assertIn(models.Tag._meta.db_table, sql)
+        self.assertIn(models.Reporter._meta.db_table, sql)
 
     def test_query_encoding(self):
         """
         Test that last_executed_query() returns an Unicode string
         """
-        tags = models.Tag.objects.extra(select={'föö': 1})
-        sql, params = tags.query.sql_with_params()
-        cursor = tags.query.get_compiler('default').execute_sql(None)
+        persons = models.Reporter.objects.filter(raw_data=b'\x00\x46  \xFE').extra(select={'föö': 1})
+        sql, params = persons.query.sql_with_params()
+        cursor = persons.query.get_compiler('default').execute_sql(None)
         last_sql = cursor.db.ops.last_executed_query(cursor, sql, params)
         self.assertTrue(isinstance(last_sql, six.text_type))
 
@@ -361,17 +363,33 @@ class ConnectionCreatedSignalTest(TransactionTestCase):
 
 
 class EscapingChecks(TestCase):
+    """
+    All tests in this test case are also run with settings.DEBUG=True in
+    EscapingChecksDebug test case, to also test CursorDebugWrapper.
+    """
+    def test_paramless_no_escaping(self):
+        cursor = connection.cursor()
+        cursor.execute("SELECT '%s'")
+        self.assertEqual(cursor.fetchall()[0][0], '%s')
+
+    def test_parameter_escaping(self):
+        cursor = connection.cursor()
+        cursor.execute("SELECT '%%', %s", ('%d',))
+        self.assertEqual(cursor.fetchall()[0], ('%', '%d'))
 
     @unittest.skipUnless(connection.vendor == 'sqlite',
                          "This is a sqlite-specific issue")
-    def test_parameter_escaping(self):
+    def test_sqlite_parameter_escaping(self):
         #13648: '%s' escaping support for sqlite3
         cursor = connection.cursor()
-        response = cursor.execute(
-            "select strftime('%%s', date('now'))").fetchall()[0][0]
-        self.assertNotEqual(response, None)
+        cursor.execute("select strftime('%s', date('now'))")
+        response = cursor.fetchall()[0][0]
         # response should be an non-zero integer
         self.assertTrue(int(response))
+
+@override_settings(DEBUG=True)
+class EscapingChecksDebug(EscapingChecks):
+    pass
 
 
 class SqlliteAggregationTests(TestCase):
@@ -778,3 +796,42 @@ class DBConstraintTestCase(TransactionTestCase):
         intermediary_model.objects.create(from_object_id=obj.id, to_object_id=12345)
         self.assertEqual(obj.related_objects.count(), 1)
         self.assertEqual(intermediary_model.objects.count(), 2)
+
+
+class BackendUtilTests(TestCase):
+
+    def test_format_number(self):
+        """
+        Test the format_number converter utility
+        """
+        def equal(value, max_d, places, result):
+            self.assertEqual(format_number(Decimal(value), max_d, places), result)
+
+        equal('0', 12, 3,
+              '0.000')
+        equal('0', 12, 8,
+              '0.00000000')
+        equal('1', 12, 9,
+              '1.000000000')
+        equal('0.00000000', 12, 8,
+              '0.00000000')
+        equal('0.000000004', 12, 8,
+              '0.00000000')
+        equal('0.000000008', 12, 8,
+              '0.00000001')
+        equal('0.000000000000000000999', 10, 8,
+              '0.00000000')
+        equal('0.1234567890', 12, 10,
+              '0.1234567890')
+        equal('0.1234567890', 12, 9,
+              '0.123456789')
+        equal('0.1234567890', 12, 8,
+              '0.12345679')
+        equal('0.1234567890', 12, 5,
+              '0.12346')
+        equal('0.1234567890', 12, 3,
+              '0.123')
+        equal('0.1234567890', 12, 1,
+              '0.1')
+        equal('0.1234567890', 12, 0,
+              '0')

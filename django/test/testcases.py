@@ -26,7 +26,7 @@ from django.core.management import call_command
 from django.core.management.color import no_style
 from django.core.servers.basehttp import (WSGIRequestHandler, WSGIServer,
     WSGIServerException)
-from django.core.urlresolvers import clear_url_caches
+from django.core.urlresolvers import clear_url_caches, set_urlconf
 from django.db import connection, connections, DEFAULT_DB_ALIAS, transaction
 from django.forms.fields import CharField
 from django.http import QueryDict
@@ -497,6 +497,7 @@ class TransactionTestCase(SimpleTestCase):
                              **{'verbosity': 0, 'database': db_name, 'skip_validation': True})
 
     def _urlconf_setup(self):
+        set_urlconf(None)
         if hasattr(self, 'urls'):
             self._old_root_urlconf = settings.ROOT_URLCONF
             settings.ROOT_URLCONF = self.urls
@@ -527,6 +528,7 @@ class TransactionTestCase(SimpleTestCase):
                          skip_validation=True, reset_sequences=False)
 
     def _urlconf_teardown(self):
+        set_urlconf(None)
         if hasattr(self, '_old_root_urlconf'):
             settings.ROOT_URLCONF = self._old_root_urlconf
             clear_url_caches()
@@ -817,9 +819,6 @@ class TestCase(TransactionTestCase):
             self.atomics[db_name].__enter__()
         # Remove this when the legacy transaction management goes away.
         disable_transaction_methods()
-
-        from django.contrib.sites.models import Site
-        Site.objects.clear_cache()
 
         for db in self._databases_names(include_mirrors=False):
             if hasattr(self, 'fixtures'):
@@ -1119,8 +1118,8 @@ class LiveServerTestCase(TransactionTestCase):
                     for port in range(extremes[0], extremes[1] + 1):
                         possible_ports.append(port)
         except Exception:
-            raise ImproperlyConfigured('Invalid address ("%s") for live '
-                'server.' % specified_address)
+            msg = 'Invalid address ("%s") for live server.' % specified_address
+            six.reraise(ImproperlyConfigured, ImproperlyConfigured(msg), sys.exc_info()[2])
         cls.server_thread = LiveServerThread(
             host, possible_ports, connections_override)
         cls.server_thread.daemon = True

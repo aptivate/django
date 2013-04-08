@@ -377,6 +377,10 @@ The default form widget for this field is a
 If you need to accept :attr:`~Field.null` values then use
 :class:`NullBooleanField` instead.
 
+.. versionchanged:: 1.6
+    The default value of ``BooleanField`` was changed from ``False`` to
+    ``None`` when :attr:`Field.default` isn't defined.
+
 ``CharField``
 -------------
 
@@ -872,8 +876,8 @@ widget for this field is a :class:`~django.forms.NullBooleanSelect`.
 
 .. class:: PositiveIntegerField([**options])
 
-Like an :class:`IntegerField`, but must be either positive or zero (`0`).
-The value `0` is accepted for backward compatibility reasons.
+Like an :class:`IntegerField`, but must be either positive or zero (``0``).
+The value ``0`` is accepted for backward compatibility reasons.
 
 ``PositiveSmallIntegerField``
 -----------------------------

@@ -35,6 +35,7 @@ The PRIMARY AUTHORS are (and/or have been):
     * Bryan Veloso
     * Preston Holmes
     * Simon Charette
+    * Donald Stufft
 
 More information on the main contributors to Django can be found in
 docs/internals/committers.txt.
@@ -143,7 +144,9 @@ answer newbie questions, and generally made Django that much better:
     colin@owlfish.com
     crankycoder@gmail.com
     Paul Collier <paul@paul-collier.com>
+    Paul Collins <paul.collins.iii@gmail.com>
     Robert Coup
+    Deric Crago <deric.crago@gmail.com>
     David Cramer <dcramer@gmail.com>
     Pete Crosier <pete.crosier@gmail.com>
     Matt Croydon <http://www.postneo.com/>
@@ -526,6 +529,7 @@ answer newbie questions, and generally made Django that much better:
     Johan C. Stöver <johan@nilling.nl>
     Nowell Strite <http://nowell.strite.org/>
     Thomas Stromberg <tstromberg@google.com>
+    Hannes Struß <x@hannesstruss.de>
     Ben Sturmfels <ben@sturm.com.au>
     Travis Swicegood <travis@domain51.com>
     Pascal Varet
@@ -605,7 +609,6 @@ answer newbie questions, and generally made Django that much better:
     Gasper Zejn <zejn@kiberpipa.org>
     Jarek Zgoda <jarek.zgoda@gmail.com>
     Cheng Zhang
-    Hannes Struß <x@hannesstruss.de>
 
 A big THANK YOU goes to:
 
@@ -616,6 +619,7 @@ A big THANK YOU goes to:
 
     Ian Bicking for convincing Adrian to ditch code generation.
 
-    Mark Pilgrim for diveintopython.org. (RIP!)
+    Mark Pilgrim for "Dive Into Python" (http://diveintopython.net,
+    http://www.diveintopython3.net).
 
     Guido van Rossum for creating Python.

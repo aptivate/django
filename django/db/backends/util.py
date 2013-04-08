@@ -35,11 +35,14 @@ class CursorWrapper(object):
 
 class CursorDebugWrapper(CursorWrapper):
 
-    def execute(self, sql, params=()):
+    def execute(self, sql, params=None):
         self.db.set_dirty()
         start = time()
         try:
             with self.db.wrap_database_errors():
+                if params is None:
+                    # params default might be backend specific
+                    return self.cursor.execute(sql)
                 return self.cursor.execute(sql, params)
         finally:
             stop = time()
@@ -150,6 +153,6 @@ def format_number(value, max_digits, decimal_places):
     if isinstance(value, decimal.Decimal):
         context = decimal.getcontext().copy()
         context.prec = max_digits
-        return '%s' % str(value.quantize(decimal.Decimal(".1") ** decimal_places, context=context))
+        return "{0:f}".format(value.quantize(decimal.Decimal(".1") ** decimal_places, context=context))
     else:
         return "%.*f" % (decimal_places, value)

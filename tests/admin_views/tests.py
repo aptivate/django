@@ -6,7 +6,7 @@ import re
 import datetime
 try:
     from urllib.parse import urljoin
-except ImportError:     # Python 2
+except ImportError:  # Python 2
     from urlparse import urljoin
 
 from django.conf import settings, global_settings
@@ -25,6 +25,7 @@ from django.contrib.admin.tests import AdminSeleniumWebDriverTestCase
 from django.contrib.auth import REDIRECT_FIELD_NAME
 from django.contrib.auth.models import Group, User, Permission, UNUSABLE_PASSWORD
 from django.contrib.contenttypes.models import ContentType
+from django.core.urlresolvers import reverse
 from django.forms.util import ErrorList
 from django.template.response import TemplateResponse
 from django.test import TestCase
@@ -32,7 +33,7 @@ from django.utils import formats, translation, unittest
 from django.utils.cache import get_max_age
 from django.utils.encoding import iri_to_uri, force_bytes
 from django.utils.html import escape
-from django.utils.http import urlencode
+from django.utils.http import urlencode, urlquote
 from django.utils._os import upath
 from django.utils import six
 from django.test.utils import override_settings
@@ -981,6 +982,32 @@ class AdminViewPermissionsTest(TestCase):
         login = self.client.post('/test_admin/admin/', dict(self.super_login, **new_next), QUERY_STRING=query_string)
         self.assertRedirects(login, redirect_url)
 
+    def testDoubleLoginIsNotAllowed(self):
+        """Regression test for #19327"""
+        response = self.client.get('/test_admin/admin/')
+        self.assertEqual(response.status_code, 200)
+
+        # Establish a valid admin session
+        login = self.client.post('/test_admin/admin/', self.super_login)
+        self.assertRedirects(login, '/test_admin/admin/')
+        self.assertFalse(login.context)
+
+        # Logging in with non-admin user fails
+        login = self.client.post('/test_admin/admin/', self.joepublic_login)
+        self.assertEqual(login.status_code, 200)
+        self.assertContains(login, ERROR_MESSAGE)
+
+        # Establish a valid admin session
+        login = self.client.post('/test_admin/admin/', self.super_login)
+        self.assertRedirects(login, '/test_admin/admin/')
+        self.assertFalse(login.context)
+
+        # Logging in with admin user while already logged in
+        login = self.client.post('/test_admin/admin/', self.super_login)
+        self.assertRedirects(login, '/test_admin/admin/')
+        self.assertFalse(login.context)
+        self.client.get('/test_admin/admin/logout/')
+
     def testAddView(self):
         """Test add view restricts access and actually adds items."""
 
@@ -1450,21 +1477,23 @@ class AdminViewStringPrimaryKeyTest(TestCase):
         "Link to the changeform of the object in changelist should use reverse() and be quoted -- #18072"
         prefix = '/test_admin/admin/admin_views/modelwithstringprimarykey/'
         response = self.client.get(prefix)
-        # this URL now comes through reverse(), thus iri_to_uri encoding
-        pk_final_url = escape(iri_to_uri(quote(self.pk)))
+        # this URL now comes through reverse(), thus url quoting and iri_to_uri encoding
+        pk_final_url = escape(iri_to_uri(urlquote(quote(self.pk))))
         should_contain = """<th><a href="%s%s/">%s</a></th>""" % (prefix, pk_final_url, escape(self.pk))
         self.assertContains(response, should_contain)
 
     def test_recentactions_link(self):
         "The link from the recent actions list referring to the changeform of the object should be quoted"
         response = self.client.get('/test_admin/admin/')
-        should_contain = """<a href="admin_views/modelwithstringprimarykey/%s/">%s</a>""" % (escape(quote(self.pk)), escape(self.pk))
+        link = reverse('admin:admin_views_modelwithstringprimarykey_change', args=(quote(self.pk),))
+        should_contain = """<a href="%s">%s</a>""" % (link, escape(self.pk))
         self.assertContains(response, should_contain)
 
     def test_recentactions_without_content_type(self):
         "If a LogEntry is missing content_type it will not display it in span tag under the hyperlink."
         response = self.client.get('/test_admin/admin/')
-        should_contain = """<a href="admin_views/modelwithstringprimarykey/%s/">%s</a>""" % (escape(quote(self.pk)), escape(self.pk))
+        link = reverse('admin:admin_views_modelwithstringprimarykey_change', args=(quote(self.pk),))
+        should_contain = """<a href="%s">%s</a>""" % (link, escape(self.pk))
         self.assertContains(response, should_contain)
         should_contain = "Model with string primary key"  # capitalized in Recent Actions
         self.assertContains(response, should_contain)
@@ -1484,8 +1513,8 @@ class AdminViewStringPrimaryKeyTest(TestCase):
     def test_deleteconfirmation_link(self):
         "The link from the delete confirmation page referring back to the changeform of the object should be quoted"
         response = self.client.get('/test_admin/admin/admin_views/modelwithstringprimarykey/%s/delete/' % quote(self.pk))
-        # this URL now comes through reverse(), thus iri_to_uri encoding
-        should_contain = """/%s/">%s</a>""" % (escape(iri_to_uri(quote(self.pk))), escape(self.pk))
+        # this URL now comes through reverse(), thus url quoting and iri_to_uri encoding
+        should_contain = """/%s/">%s</a>""" % (escape(iri_to_uri(urlquote(quote(self.pk)))), escape(self.pk))
         self.assertContains(response, should_contain)
 
     def test_url_conflicts_with_add(self):
@@ -2547,7 +2576,7 @@ class AdminCustomQuerysetTest(TestCase):
                 self.assertNotContains(response, 'Primary key = %s' % i)
 
     def test_changelist_view_count_queries(self):
-        #create 2 Person objects
+        # create 2 Person objects
         Person.objects.create(name='person1', gender=1)
         Person.objects.create(name='person2', gender=2)
 
@@ -2599,7 +2628,7 @@ class AdminCustomQuerysetTest(TestCase):
         # Message should contain non-ugly model verbose name
         self.assertContains(
             response,
-            '<li class="info">The cover letter &quot;Candidate, Best&quot; was added successfully.</li>',
+            '<li class="success">The cover letter &quot;Candidate, Best&quot; was added successfully.</li>',
             html=True
         )
 
@@ -2617,7 +2646,7 @@ class AdminCustomQuerysetTest(TestCase):
         # Message should contain non-ugly model verbose name
         self.assertContains(
             response,
-            '<li class="info">The short message &quot;ShortMessage object&quot; was added successfully.</li>',
+            '<li class="success">The short message &quot;ShortMessage object&quot; was added successfully.</li>',
             html=True
         )
 
@@ -2638,7 +2667,7 @@ class AdminCustomQuerysetTest(TestCase):
         # Message should contain non-ugly model verbose name
         self.assertContains(
             response,
-            '<li class="info">The telegram &quot;Urgent telegram&quot; was added successfully.</li>',
+            '<li class="success">The telegram &quot;Urgent telegram&quot; was added successfully.</li>',
             html=True
         )
 
@@ -2656,7 +2685,7 @@ class AdminCustomQuerysetTest(TestCase):
         # Message should contain non-ugly model verbose name
         self.assertContains(
             response,
-            '<li class="info">The paper &quot;Paper object&quot; was added successfully.</li>',
+            '<li class="success">The paper &quot;Paper object&quot; was added successfully.</li>',
             html=True
         )
 
@@ -2681,7 +2710,7 @@ class AdminCustomQuerysetTest(TestCase):
         # representation is set by model's __unicode__()
         self.assertContains(
             response,
-            '<li class="info">The cover letter &quot;John Doe II&quot; was changed successfully.</li>',
+            '<li class="success">The cover letter &quot;John Doe II&quot; was changed successfully.</li>',
             html=True
         )
 
@@ -2703,7 +2732,7 @@ class AdminCustomQuerysetTest(TestCase):
         # instance representation is set by six.text_type()
         self.assertContains(
             response,
-            '<li class="info">The short message &quot;ShortMessage_Deferred_timestamp object&quot; was changed successfully.</li>',
+            '<li class="success">The short message &quot;ShortMessage_Deferred_timestamp object&quot; was changed successfully.</li>',
             html=True
         )
 
@@ -2728,7 +2757,7 @@ class AdminCustomQuerysetTest(TestCase):
         # representation is set by model's __unicode__()
         self.assertContains(
             response,
-            '<li class="info">The telegram &quot;Telegram without typo&quot; was changed successfully.</li>',
+            '<li class="success">The telegram &quot;Telegram without typo&quot; was changed successfully.</li>',
             html=True
         )
 
@@ -2750,7 +2779,7 @@ class AdminCustomQuerysetTest(TestCase):
         # instance representation is set by six.text_type()
         self.assertContains(
             response,
-            '<li class="info">The paper &quot;Paper_Deferred_author object&quot; was changed successfully.</li>',
+            '<li class="success">The paper &quot;Paper_Deferred_author object&quot; was changed successfully.</li>',
             html=True
         )
 

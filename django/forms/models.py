@@ -110,7 +110,7 @@ def model_to_dict(instance, fields=None, exclude=None):
     from django.db.models.fields.related import ManyToManyField
     opts = instance._meta
     data = {}
-    for f in opts.fields + opts.many_to_many:
+    for f in opts.concrete_fields + opts.many_to_many:
         if not f.editable:
             continue
         if fields and not f.name in fields:
@@ -149,7 +149,7 @@ def fields_for_model(model, fields=None, exclude=None, widgets=None, formfield_c
     field_list = []
     ignored = []
     opts = model._meta
-    for f in sorted(opts.fields + opts.many_to_many):
+    for f in sorted(opts.concrete_fields + opts.many_to_many):
         if not f.editable:
             continue
         if fields is not None and not f.name in fields:
@@ -205,6 +205,21 @@ class ModelFormMetaclass(type):
         if 'media' not in attrs:
             new_class.media = media_property(new_class)
         opts = new_class._meta = ModelFormOptions(getattr(new_class, 'Meta', None))
+
+        # We check if a string was passed to `fields` or `exclude`,
+        # which is likely to be a mistake where the user typed ('foo') instead
+        # of ('foo',)
+        for opt in ['fields', 'exclude']:
+            value = getattr(opts, opt)
+            if isinstance(value, six.string_types):
+                msg = ("%(model)s.Meta.%(opt)s cannot be a string. "
+                       "Did you mean to type: ('%(value)s',)?" % {
+                           'model': new_class.__name__,
+                           'opt': opt,
+                           'value': value,
+                       })
+                raise TypeError(msg)
+
         if opts.model:
             # If a model is defined, extract form fields from it.
             fields = fields_for_model(opts.model, opts.fields,
@@ -682,7 +697,7 @@ class BaseModelFormSet(BaseFormSet):
 def modelformset_factory(model, form=ModelForm, formfield_callback=None,
                          formset=BaseModelFormSet, extra=1, can_delete=False,
                          can_order=False, max_num=None, fields=None,
-                         exclude=None, widgets=None):
+                         exclude=None, widgets=None, validate_max=False):
     """
     Returns a FormSet class for the given Django model class.
     """
@@ -690,7 +705,8 @@ def modelformset_factory(model, form=ModelForm, formfield_callback=None,
                              formfield_callback=formfield_callback,
                              widgets=widgets)
     FormSet = formset_factory(form, formset, extra=extra, max_num=max_num,
-                              can_order=can_order, can_delete=can_delete)
+                              can_order=can_order, can_delete=can_delete,
+                              validate_max=validate_max)
     FormSet.model = model
     return FormSet
 
@@ -826,7 +842,7 @@ def inlineformset_factory(parent_model, model, form=ModelForm,
                           formset=BaseInlineFormSet, fk_name=None,
                           fields=None, exclude=None,
                           extra=3, can_order=False, can_delete=True, max_num=None,
-                          formfield_callback=None, widgets=None):
+                          formfield_callback=None, widgets=None, validate_max=False):
     """
     Returns an ``InlineFormSet`` for the given kwargs.
 
@@ -848,6 +864,7 @@ def inlineformset_factory(parent_model, model, form=ModelForm,
         'exclude': exclude,
         'max_num': max_num,
         'widgets': widgets,
+        'validate_max': validate_max,
     }
     FormSet = modelformset_factory(model, **kwargs)
     FormSet.fk = fk
@@ -933,7 +950,7 @@ class ModelChoiceField(ChoiceField):
 
     def __init__(self, queryset, empty_label="---------", cache_choices=False,
                  required=True, widget=None, label=None, initial=None,
-                 help_text=None, to_field_name=None, *args, **kwargs):
+                 help_text='', to_field_name=None, *args, **kwargs):
         if required and (initial is not None):
             self.empty_label = None
         else:
@@ -1029,7 +1046,7 @@ class ModelMultipleChoiceField(ModelChoiceField):
 
     def __init__(self, queryset, cache_choices=False, required=True,
                  widget=None, label=None, initial=None,
-                 help_text=None, *args, **kwargs):
+                 help_text='', *args, **kwargs):
         super(ModelMultipleChoiceField, self).__init__(queryset, None,
             cache_choices, required, widget, label, initial, help_text,
             *args, **kwargs)

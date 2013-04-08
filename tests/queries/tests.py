@@ -1785,7 +1785,6 @@ class Queries6Tests(TestCase):
 
         # Nested queries are possible (although should be used with care, since
         # they have performance problems on backends like MySQL.
-
         self.assertQuerysetEqual(
             Annotation.objects.filter(notes__in=Note.objects.filter(note="n1")),
             ['<Annotation: a1>']
@@ -2808,3 +2807,27 @@ class RelabelCloneTest(TestCase):
         # not change results for the parents query.
         self.assertEqual(list(children), [my2])
         self.assertEqual(list(parents), [my1])
+
+class Ticket20101Tests(TestCase):
+    def test_ticket_20101(self):
+        """
+        Tests QuerySet ORed combining in exclude subquery case.
+        """
+        t = Tag.objects.create(name='foo')
+        a1 = Annotation.objects.create(tag=t, name='a1')
+        a2 = Annotation.objects.create(tag=t, name='a2')
+        a3 = Annotation.objects.create(tag=t, name='a3')
+        n = Note.objects.create(note='foo', misc='bar')
+        qs1 = Note.objects.exclude(annotation__in=[a1, a2])
+        qs2 = Note.objects.filter(annotation__in=[a3])
+        self.assertTrue(n in qs1)
+        self.assertFalse(n in qs2)
+        self.assertTrue(n in (qs1 | qs2))
+
+class EmptyStringPromotionTests(TestCase):
+    def test_empty_string_promotion(self):
+        qs = RelatedObject.objects.filter(single__name='')
+        if connection.features.interprets_empty_strings_as_nulls:
+            self.assertIn('LEFT OUTER JOIN', str(qs.query))
+        else:
+            self.assertNotIn('LEFT OUTER JOIN', str(qs.query))

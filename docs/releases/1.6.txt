@@ -2,6 +2,24 @@
 Django 1.6 release notes - UNDER DEVELOPMENT
 ============================================
 
+.. note::
+
+    Dedicated to Malcolm Tredinnick
+
+    On March 17, 2013, the Django project and the free software community lost
+    a very dear friend and developer.
+
+    Malcolm was a long-time contributor to Django, a model community member, a
+    brilliant mind, and a friend. His contributions to Django — and to many other
+    open source projects — are nearly impossible to enumerate. Many on the core
+    Django team had their first patches reviewed by him; his mentorship enriched
+    us. His consideration, patience, and dedication will always be an inspiration
+    to us.
+
+    This release of Django is for Malcolm.
+
+    -- The Django Developers
+
 Welcome to Django 1.6!
 
 These release notes cover the `new features`_, as well as some `backwards
@@ -66,6 +84,12 @@ UTC. This limitation was lifted in Django 1.6. Use :meth:`QuerySet.datetimes()
 <django.db.models.query.QuerySet.datetimes>` to perform time zone aware
 aggregation on a :class:`~django.db.models.DateTimeField`.
 
+Support for savepoints in SQLite
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Django 1.6 adds support for savepoints in SQLite, with some :ref:`limitations
+<savepoints-in-sqlite>`.
+
 ``BinaryField`` model field
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -126,6 +150,10 @@ Minor features
 * The ``MemcachedCache`` cache backend now uses the latest :mod:`pickle`
   protocol available.
 
+* Added :class:`~django.contrib.messages.views.SuccessMessageMixin` which
+  provides a ``success_message`` attribute for
+  :class:`~django.views.generic.edit.FormView` based classes.
+
 * Added the :attr:`django.db.models.ForeignKey.db_constraint` and
   :attr:`django.db.models.ManyToManyField.db_constraint` options.
 
@@ -154,6 +182,26 @@ Minor features
   ``UPDATE`` - if not updated - ``INSERT`` instead of ``SELECT`` - if not
   found ``INSERT`` else ``UPDATE`` in case the model's primary key is set.
 
+* The documentation contains a :doc:`deployment checklist
+  </howto/deployment/checklist>`.
+
+* The :djadmin:`diffsettings` comand gained a ``--all`` option.
+
+* ``django.forms.fields.Field.__init__`` now calls ``super()``, allowing
+  field mixins to implement ``__init__()`` methods that will reliably be
+  called.
+
+* The ``validate_max`` parameter was added to ``BaseFormSet`` and
+  :func:`~django.forms.formsets.formset_factory`, and ``ModelForm`` and inline
+  versions of the same.  The behavior of validation for formsets with
+  ``max_num`` was clarified.  The previously undocumented behavior that
+  hardened formsets against memory exhaustion attacks was documented,
+  and the undocumented limit of the higher of 1000 or ``max_num`` forms
+  was changed so it is always 1000 more than ``max_num``.
+
+* Added ``BCryptSHA256PasswordHasher`` to resolve the password truncation issue
+  with bcrypt.
+
 Backwards incompatible changes in 1.6
 =====================================
 
@@ -168,11 +216,28 @@ Backwards incompatible changes in 1.6
 New transaction management model
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+Behavior changes
+^^^^^^^^^^^^^^^^
+
 Database-level autocommit is enabled by default in Django 1.6. While this
 doesn't change the general spirit of Django's transaction management, there
 are a few known backwards-incompatibities, described in the :ref:`transaction
 management docs <transactions-upgrading-from-1.5>`. You should review your
 code to determine if you're affected.
+
+Savepoints and ``assertNumQueries``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The changes in transaction management may result in additional statements to
+create, release or rollback savepoints. This is more likely to happen with
+SQLite, since it didn't support savepoints until this release.
+
+If tests using :meth:`~django.test.TestCase.assertNumQueries` fail because of
+a higher number of queries than expected, check that the extra queries are
+related to savepoints, and adjust the expected number of queries accordingly.
+
+Autocommit option for PostgreSQL
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 In previous versions, database-level autocommit was only an option for
 PostgreSQL, and it was disabled by default. This option is now :ref:`ignored
@@ -248,6 +313,20 @@ should either restore Django's defaults at the end of each request, force an
 appropriate value at the beginning of each request, or disable persistent
 connections.
 
+``BooleanField`` no longer defaults to ``False``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When a :class:`~django.db.models.BooleanField` doesn't have an explicit
+:attr:`~django.db.models.Field.default`, the implicit default value is
+``None``. In previous version of Django, it was ``False``, but that didn't
+represent accurately the lack of a value.
+
+Code that relies on the default value being ``False`` may raise an exception
+when saving new model instances to the database, because ``None`` isn't an
+acceptable value for a :class:`~django.db.models.BooleanField`. You should
+either specify ``default=False`` in the field definition, or ensure the field
+is set to ``True`` or ``False`` before saving the object.
+
 Translations and comments in templates
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -270,11 +349,21 @@ specified using ``{#`` / ``#}`` is now stricter. All translator comments not
 located at the end of their respective lines in a template are ignored and a
 warning is generated by :djadmin:`makemessages` when it finds them. E.g.:
 
-  .. code-block:: html+django
+.. code-block:: html+django
 
     {# Translators: This is ignored #}{% trans "Translate me" %}
     {{ title }}{# Translators: Extracted and associated with 'Welcome' below #}
     <h1>{% trans "Welcome" %}</h1>
+
+Quoting in :func:`~django.core.urlresolvers.reverse`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When reversing URLs, Django didn't apply :func:`~django.utils.http.urlquote`
+to arguments before interpolating them in URL patterns. This bug is fixed in
+Django 1.6. If you worked around this bug by applying URL quoting before
+passing arguments to :func:`~django.core.urlresolvers.reverse`, this may
+result in double-quoting. If this happens, simply remove the URL quoting from
+your code.
 
 Storage of IP addresses in the comments app
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -302,6 +391,24 @@ For Oracle, execute this query:
 If you do not apply this change, the behaviour is unchanged: on MySQL, IPv6
 addresses are silently truncated; on Oracle, an exception is generated. No
 database change is needed for SQLite or PostgreSQL databases.
+
+Percent literals in ``cursor.execute`` queries
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When you are running raw SQL queries through the
+:ref:`cursor.execute <executing-custom-sql>` method, the rule about doubling
+percent literals (``%``) inside the query has been unified. Past behavior
+depended on the database backend. Now, across all backends, you only need to
+double literal percent characters if you are also providing replacement
+parameters. For example::
+
+    # No parameters, no percent doubling
+    cursor.execute("SELECT foo FROM bar WHERE baz = '30%'")
+
+    # Parameters passed, non-placeholders have to be doubled
+    cursor.execute("SELECT foo FROM bar WHERE baz = '30%%' and id = %s", [self.id])
+
+``SQLite`` users need to check and update such queries.
 
 Miscellaneous
 ~~~~~~~~~~~~~
@@ -346,6 +453,17 @@ in an external repository`__.
 
 __ https://disqus.com/
 __ https://github.com/django/django-contrib-comments
+
+Support for PostgreSQL versions older than 8.4
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The end of upstream support periods was reached in December 2011 for
+PostgreSQL 8.2 and in February 2013 for 8.3. As a consequence, Django 1.6 sets
+8.4 as the minimum PostgreSQL version it officially supports.
+
+You're strongly encouraged to use the most recent version of PostgreSQL
+available, because of performance improvements and to take advantage of the
+native streaming replication available in PostgreSQL 9.x.
 
 Changes to :ttag:`cycle` and :ttag:`firstof`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
