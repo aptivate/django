@@ -1846,3 +1846,30 @@ class FormsTestCase(TestCase):
 
         self.assertHTMLEqual(boundfield.label_tag(), 'Field')
         self.assertHTMLEqual(boundfield.label_tag('Custom&'), 'Custom&amp;')
+
+class PasswordChangeForm(Form):
+    password = CharField()
+    password_verify = CharField()
+    
+    def clean(self):
+        cleaned_data = super(PasswordChangeForm, self).clean()
+        if cleaned_data['password'] != cleaned_data['password_verify']:
+            raise ValidationError({
+                'password': ['Your password is too short'],
+                'password_verify': ['Please enter the same password twice']
+            })
+
+class FormCleanFieldErrorsTest(TestCase):
+    """A form's clean() method may be able to tell that an individual
+    field is not valid by referencing other fields. It's nice to be able
+    to report the error against one field (by throwing a ValidationError
+    with a dict) rather than the whole form."""
+    
+    def test_form_clean(self):
+        # Pass a dictionary to a Form's __init__().
+        form = PasswordChangeForm({'password': 'foo', 'password_verify': 'bar'})
+        form.full_clean()
+        self.assertNotIn(forms.NON_FIELD_ERRORS, form.errors)
+        self.assertEqual(['Your password is too short'], form.errors['password'])
+        self.assertEqual(['Please enter the same password twice'],
+            form.errors['password_verify'])

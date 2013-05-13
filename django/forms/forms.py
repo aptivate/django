@@ -303,7 +303,11 @@ class BaseForm(object):
         try:
             self.cleaned_data = self.clean()
         except ValidationError as e:
-            self._errors[NON_FIELD_ERRORS] = self.error_class(e.messages)
+            if hasattr(e, 'message_dict'):
+                for field, error_strings in e.message_dict.items():
+                    self._errors[field] = self.error_class(error_strings)
+            else:
+                self._errors[NON_FIELD_ERRORS] = self.error_class(e.messages)
 
     def _post_clean(self):
         """
