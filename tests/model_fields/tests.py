@@ -13,7 +13,8 @@ from django.utils import unittest
 
 from .models import (Foo, Bar, Whiz, BigD, BigS, Image, BigInt, Post,
     NullBooleanModel, BooleanModel, DataModel, Document, RenamedField,
-    VerboseNameField, FksToBooleans)
+    VerboseNameField, FksToBooleans, AutoFieldWithOldError,
+    AutoFieldWithNewError)
 
 
 class BasicFieldTests(test.TestCase):
@@ -457,3 +458,25 @@ class BinaryFieldTests(test.TestCase):
     def test_max_length(self):
         dm = DataModel(short_data=self.binary_data*4)
         self.assertRaises(ValidationError, dm.full_clean)
+
+class AutoFieldTests(unittest.TestCase):
+    def test_to_python_with_invalid_value(self):
+        """AutoField.to_python should throw an error indicating the model and
+        field name that you tried to assign to, and the value you assigned.
+        Otherwise it can be hard to debug when your fixtures don't match the
+        current model's primary key type."""
+        
+        for model in VerboseNameField, AutoFieldWithOldError, AutoFieldWithNewError:
+            f = model._meta.get_field('id')
+            try:
+                f.to_python('abc')
+                self.fail('to_python failed to throw an exception')
+            except ValidationError as e:
+                if model == AutoFieldWithOldError:
+                    msg = f.error_messages['invalid'] % 'abc'
+                else:
+                    msg = f.error_messages['invalid_new'] % (
+                        f.model._meta.object_name, f.name, 'abc')
+                
+                self.assertEqual([msg], e.messages, "Wrong validation error "
+                    "message for %s" % model)

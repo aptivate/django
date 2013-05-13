@@ -202,3 +202,13 @@ if Image:
                                   width_field='headshot_width')
 
 ###############################################################################
+
+class AutoFieldWithOldError(models.Model):
+    id = models.AutoField(primary_key=True, error_messages={
+        'invalid': 'whee %s'
+        })
+
+class AutoFieldWithNewError(models.Model):
+    id = models.AutoField(primary_key=True, error_messages={
+        'invalid_new': 'whee %s baz %s bonk %s'
+        })

@@ -130,6 +130,7 @@ class Field(object):
 
         self.validators = self.default_validators + validators
 
+        self.overridden_error_messages = error_messages
         messages = {}
         for c in reversed(self.__class__.__mro__):
             messages.update(getattr(c, 'default_error_messages', {}))
@@ -570,6 +571,8 @@ class AutoField(Field):
     empty_strings_allowed = False
     default_error_messages = {
         'invalid': _("'%s' value must be an integer."),
+        'invalid_new': _("%s.%s is not allowed to have value '%s', it "
+            "should be an integer."),
     }
 
     def __init__(self, *args, **kwargs):
@@ -587,7 +590,18 @@ class AutoField(Field):
         try:
             return int(value)
         except (TypeError, ValueError):
-            msg = self.error_messages['invalid'] % value
+            # If the user has supplied 'invalid' and not 'invalid_new',
+            # fall back to old message for compatibility. Otherwise use
+            # the new format.
+            if self.overridden_error_messages is not None \
+                and 'invalid_new' not in self.overridden_error_messages \
+                and 'invalid' in self.overridden_error_messages:
+            
+                msg = self.error_messages['invalid'] % value
+            else:
+                msg = self.error_messages['invalid_new'] % (
+                    self.model._meta.object_name, self.name, value)
+            
             raise exceptions.ValidationError(msg)
 
     def validate(self, value, model_instance):
