@@ -29,6 +29,7 @@ urlpatterns = patterns('',
     (r'^permission_protected_method_view/$', views.permission_protected_method_view),
     (r'^session_view/$', views.session_view),
     (r'^broken_view/$', views.broken_view),
+    (r'^broken_response/$', views.broken_response),
     (r'^mail_sending_view/$', views.mail_sending_view),
     (r'^mass_mail_sending_view/$', views.mass_mail_sending_view)
 )

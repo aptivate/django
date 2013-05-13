@@ -431,6 +431,20 @@ class ClientTest(TestCase):
         except KeyError:
             pass
 
+    def test_view_with_broken_response(self):
+        """Request a page that returns a BrokenResponse, that will throw
+        an exception when the TestClient tries to render it. Older versions
+        of Django used to catch this exception and return a 500 response
+        page, which didn't help much with debugging in tests."""
+        self.assertRaises(ValueError, self.client.get, "/test_client/broken_response/")
+
+        #Try the same assertion, a different way
+        try:
+            self.client.get('/test_client/broken_response/')
+            self.fail('Should raise an error')
+        except ValueError as e:
+            self.assertEqual("Oops! Looks like you wrote some bad code.", str(e))
+    
     def test_mail_sending(self):
         "Test that mail is redirected to a dummy outbox during test setup"
 

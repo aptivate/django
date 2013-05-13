@@ -192,6 +192,14 @@ def broken_view(request):
     """A view which just raises an exception, simulating a broken view."""
     raise KeyError("Oops! Looks like you wrote some bad code.")
 
+def broken_response(request):
+    """A view which returns an HttpResponse that looks valid, but throws
+    an exception when you try to render() it."""
+    class BrokenResponse(HttpResponse):
+        def render(self):
+            raise ValueError("Oops! Looks like you wrote some bad code.")
+    return BrokenResponse()
+
 def mail_sending_view(request):
     mail.EmailMessage(
         "Test message",
