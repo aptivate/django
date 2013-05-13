@@ -4,11 +4,13 @@ Unit tests for reverse URL lookups.
 from __future__ import absolute_import, unicode_literals
 
 from django.conf import settings
+from django.conf.urls import patterns, url, include
+from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.core.exceptions import ImproperlyConfigured, ViewDoesNotExist
 from django.core.urlresolvers import (reverse, resolve, get_callable,
     get_resolver, NoReverseMatch, Resolver404, ResolverMatch, RegexURLResolver,
-    RegexURLPattern)
+    RegexURLPattern, clear_url_caches, set_urlconf)
 from django.http import HttpRequest, HttpResponseRedirect, HttpResponsePermanentRedirect
 from django.shortcuts import redirect
 from django.test import TestCase
@@ -191,6 +193,62 @@ class URLPatternReverse(TestCase):
         # Regression for #20022
         self.assertEqual('/%7Eme/places/1/',
                 reverse('places', args=[1], prefix='/~me/'))
+    
+    def test_reverse_named_url_with_wrong_args(self):
+        urls = (
+            url(r'^places/(\d+|[a-z_]+)/', views.empty_view, name="places3"),
+            )
+        try:
+            got = reverse("places3", args=[4, 5], urlconf=urls)
+            self.fail('Should raise an error')
+        except NoReverseMatch as e:
+            resolver = get_resolver(urls)
+            self.assertEqual("Reverse for 'places3' with arguments '(4, 5)' "
+                "and keyword arguments '{}' not found. Possible matches: %s" %
+                str([resolver.reverse_dict['places3']]), str(e))
+    
+    def test_reverse_function_with_wrong_args(self):
+        urls = (
+            url(r'^places/(\d+|[a-z_]+)/', views.empty_view, name="places3"),
+            )
+        try:
+            got = reverse(views.empty_view, args=[4, 5], urlconf=urls)
+            self.fail('Should raise an error')
+        except NoReverseMatch as e:
+            resolver = get_resolver(urls)
+            self.assertEqual("Reverse for "
+                "'urlpatterns_reverse.views.empty_view' with arguments "
+                "'(4, 5)' and keyword arguments '{}' not found. "
+                "Possible matches: %s" % str([resolver.reverse_dict['places3']]),
+                str(e))
+
+    def test_reverse_differently_wrapped_function(self):
+        urls = (
+            url(r'^places/', login_required(views.empty_view), name="places3"),
+            )
+        try:
+            got = reverse(views.empty_view, urlconf=urls)
+            self.fail('Should raise an error')
+        except NoReverseMatch as e:
+            resolver = get_resolver(urls)
+            self.assertEqual("Reverse for "
+                "'urlpatterns_reverse.views.empty_view' with arguments "
+                "'()' and keyword arguments '{}' not found. "
+                "Possible matches: %s" % str([resolver.reverse_dict['places3']]),
+                str(e))
+    
+    def test_reverse_no_known_match(self):
+        urls = (
+            url(r'^places/', login_required(views.empty_view), name="places3"),
+            )
+        try:
+            got = reverse('whee', urlconf=urls)
+            self.fail('Should raise an error')
+        except NoReverseMatch as e:
+            resolver = get_resolver(urls)
+            self.assertEqual("Reverse for 'whee' with arguments '()' and "
+                "keyword arguments '{}' not found. Complete reverse map: %s" %
+                str(resolver.reverse_dict), str(e))
 
 class ResolverTests(unittest.TestCase):
     def test_resolver_repr(self):

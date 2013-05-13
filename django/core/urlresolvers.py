@@ -420,8 +420,29 @@ class RegexURLResolver(LocaleRegexProvider):
             lookup_view_s = "%s.%s" % (m, n)
         else:
             lookup_view_s = lookup_view
-        raise NoReverseMatch("Reverse for '%s' with arguments '%s' and keyword "
-                "arguments '%s' not found." % (lookup_view_s, args, kwargs))
+        
+        message = ("Reverse for '%s' with arguments '%s' and keyword "
+            "arguments '%s' not found." % (lookup_view_s, args, kwargs))
+
+        possibilities = []
+
+        if lookup_view in self.reverse_dict:
+            possibilities.append(self.reverse_dict[lookup_view])
+        elif callable(lookup_view):
+            # Possibly we've been called with an unwrapped function, but
+            # the urlconf contains a wrapped version of the same function.
+            # If so, try to find it.
+            possibilities = []
+            for k, v in self.reverse_dict.iteritems():
+                if callable(k) and k.func_name == lookup_view.func_name:
+                    possibilities.append(v)
+        
+        if len(possibilities):
+            message = "%s Possible matches: %s" % (message, possibilities)
+        else:
+            message = "%s Complete reverse map: %s" % (message, self.reverse_dict)
+         
+        raise NoReverseMatch(message)
 
 class LocaleRegexURLResolver(RegexURLResolver):
     """
