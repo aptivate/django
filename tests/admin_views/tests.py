@@ -26,6 +26,7 @@ from django.contrib.auth import REDIRECT_FIELD_NAME
 from django.contrib.auth.models import Group, User, Permission, UNUSABLE_PASSWORD
 from django.contrib.contenttypes.models import ContentType
 from django.core.urlresolvers import reverse
+from django.db import connection
 from django.forms.util import ErrorList
 from django.template.response import TemplateResponse
 from django.test import TestCase
@@ -647,7 +648,7 @@ class AdminViewFormUrlTest(TestCase):
             os.path.join(os.path.dirname(upath(__file__)), 'templates'),)
         with self.settings(TEMPLATE_DIRS=template_dirs):
             response = self.client.get("/test_admin/admin/admin_views/color2/")
-            self.assertTrue('custom_filter_template.html' in [t.name for t in response.templates])
+            self.assertTemplateUsed(response, 'custom_filter_template.html')
 
 
 @override_settings(PASSWORD_HASHERS=('django.contrib.auth.hashers.SHA1PasswordHasher',))
@@ -3605,7 +3606,13 @@ class UserAdminTest(TestCase):
 
         # Don't depend on a warm cache, see #17377.
         ContentType.objects.clear_cache()
-        with self.assertNumQueries(10):
+
+        expected_queries = 10
+        # Oracle doesn't implement "RELEASE SAVPOINT", see #20387.
+        if connection.vendor == 'oracle':
+            expected_queries -= 1
+
+        with self.assertNumQueries(expected_queries):
             response = self.client.get('/test_admin/admin/auth/user/%s/' % u.pk)
             self.assertEqual(response.status_code, 200)
 
@@ -3643,7 +3650,12 @@ class GroupAdminTest(TestCase):
     def test_group_permission_performance(self):
         g = Group.objects.create(name="test_group")
 
-        with self.assertNumQueries(8):  # instead of 259!
+        expected_queries = 8
+        # Oracle doesn't implement "RELEASE SAVPOINT", see #20387.
+        if connection.vendor == 'oracle':
+            expected_queries -= 1
+
+        with self.assertNumQueries(expected_queries):
             response = self.client.get('/test_admin/admin/auth/group/%s/' % g.pk)
             self.assertEqual(response.status_code, 200)
 
@@ -3982,7 +3994,7 @@ class AdminViewLogoutTest(TestCase):
     def test_client_logout_url_can_be_used_to_login(self):
         response = self.client.get('/test_admin/admin/logout/')
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.template_name, 'registration/logged_out.html')
+        self.assertTemplateUsed(response, 'registration/logged_out.html')
         self.assertEqual(response.request['PATH_INFO'], '/test_admin/admin/logout/')
 
         # we are now logged out
@@ -3992,7 +4004,7 @@ class AdminViewLogoutTest(TestCase):
         # follow the redirect and test results.
         response = self.client.get('/test_admin/admin/logout/', follow=True)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.template_name, 'admin/login.html')
+        self.assertTemplateUsed(response, 'admin/login.html')
         self.assertEqual(response.request['PATH_INFO'], '/test_admin/admin/')
         self.assertContains(response, '<input type="hidden" name="next" value="/test_admin/admin/" />')
 

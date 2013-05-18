@@ -7,7 +7,7 @@ from django.core.urlresolvers import reverse, reverse_lazy
 from django.utils.decorators import method_decorator
 from django.views import generic
 
-from .forms import AuthorForm, ContactForm
+from .test_forms import AuthorForm, ContactForm
 from .models import Artist, Author, Book, Page, BookSigning
 
 
@@ -85,15 +85,18 @@ class ContactView(generic.FormView):
 
 class ArtistCreate(generic.CreateView):
     model = Artist
+    fields = '__all__'
 
 
 class NaiveAuthorCreate(generic.CreateView):
     queryset = Author.objects.all()
+    fields = '__all__'
 
 
 class AuthorCreate(generic.CreateView):
     model = Author
     success_url = '/list/authors/'
+    fields = '__all__'
 
 
 class SpecializedAuthorCreate(generic.CreateView):
@@ -112,19 +115,23 @@ class AuthorCreateRestricted(AuthorCreate):
 
 class ArtistUpdate(generic.UpdateView):
     model = Artist
+    fields = '__all__'
 
 
 class NaiveAuthorUpdate(generic.UpdateView):
     queryset = Author.objects.all()
+    fields = '__all__'
 
 
 class AuthorUpdate(generic.UpdateView):
     model = Author
     success_url = '/list/authors/'
+    fields = '__all__'
 
 
 class OneAuthorUpdate(generic.UpdateView):
     success_url = '/list/authors/'
+    fields = '__all__'
 
     def get_object(self):
         return Author.objects.get(pk=1)
@@ -184,6 +191,8 @@ class BookDetail(BookConfig, generic.DateDetailView):
     pass
 
 class AuthorGetQuerySetFormView(generic.edit.ModelFormMixin):
+    fields = '__all__'
+
     def get_queryset(self):
         return Author.objects.all()
 

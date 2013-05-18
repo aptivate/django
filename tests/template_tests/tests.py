@@ -36,15 +36,6 @@ from django.utils.safestring import mark_safe
 from django.utils import six
 from django.utils.tzinfo import LocalTimezone
 
-from .callables import CallableVariablesTests
-from .context import ContextTests
-from .custom import CustomTagTests, CustomFilterTests
-from .parser import ParserTests
-from .unicode import UnicodeTests
-from .nodelist import NodelistTest, ErrorIndexTest
-from .smartif import SmartIfTests
-from .response import (TemplateResponseTest, CacheMiddlewareTest,
-    SimpleTemplateResponseTest, CustomURLConfTest)
 
 try:
     from .loaders import RenderToStringTest, EggLoaderTest

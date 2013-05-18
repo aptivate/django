@@ -14,13 +14,14 @@ import subprocess
 import sys
 import codecs
 
-from django import conf, bin, get_version
+import django
+from django import conf, get_version
 from django.conf import settings
 from django.core.management import BaseCommand, CommandError
 from django.db import connection
-from django.test.simple import DjangoTestSuiteRunner
+from django.test.runner import DiscoverRunner
 from django.utils import unittest
-from django.utils.encoding import force_str, force_text
+from django.utils.encoding import force_text
 from django.utils._os import upath
 from django.utils.six import StringIO
 from django.test import LiveServerTestCase
@@ -149,8 +150,8 @@ class AdminScriptTestCase(unittest.TestCase):
         return out, err
 
     def run_django_admin(self, args, settings_file=None):
-        bin_dir = os.path.abspath(os.path.dirname(upath(bin.__file__)))
-        return self.run_test(os.path.join(bin_dir, 'django-admin.py'), args, settings_file)
+        script_dir = os.path.abspath(os.path.join(os.path.dirname(upath(django.__file__)), 'bin'))
+        return self.run_test(os.path.join(script_dir, 'django-admin.py'), args, settings_file)
 
     def run_manage(self, args, settings_file=None):
         def safe_remove(path):
@@ -1089,7 +1090,7 @@ class ManageValidate(AdminScriptTestCase):
         self.assertOutput(out, '0 errors found')
 
 
-class CustomTestRunner(DjangoTestSuiteRunner):
+class CustomTestRunner(DiscoverRunner):
 
     def __init__(self, *args, **kwargs):
         assert 'liveserver' not in kwargs

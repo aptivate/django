@@ -17,11 +17,13 @@ from ..models import (ChoiceOptionModel, ChoiceFieldModel, FileModel, Group,
 class ChoiceFieldForm(ModelForm):
     class Meta:
         model = ChoiceFieldModel
+        fields = '__all__'
 
 
 class OptionalMultiChoiceModelForm(ModelForm):
     class Meta:
         model = OptionalMultiChoiceModel
+        fields = '__all__'
 
 
 class FileForm(Form):
@@ -46,7 +48,8 @@ class TestTicket14567(TestCase):
     """
     def test_empty_queryset_return(self):
         "If a model's ManyToManyField has blank=True and is saved with no data, a queryset is returned."
-        form = OptionalMultiChoiceModelForm({'multi_choice_optional': '', 'multi_choice': ['1']})
+        option = ChoiceOptionModel.objects.create(name='default')
+        form = OptionalMultiChoiceModelForm({'multi_choice_optional': '', 'multi_choice': [option.pk]})
         self.assertTrue(form.is_valid())
         # Check that the empty value is a QuerySet
         self.assertTrue(isinstance(form.cleaned_data['multi_choice_optional'], models.query.QuerySet))
@@ -138,6 +141,7 @@ class FormsModelTestCase(TestCase):
         class BoundaryForm(ModelForm):
             class Meta:
                 model = BoundaryModel
+                fields = '__all__'
 
         f = BoundaryForm({'positive_integer': 100})
         self.assertTrue(f.is_valid())
@@ -153,6 +157,7 @@ class FormsModelTestCase(TestCase):
         class DefaultsForm(ModelForm):
             class Meta:
                 model = Defaults
+                fields = '__all__'
 
         self.assertEqual(DefaultsForm().fields['name'].initial, 'class default value')
         self.assertEqual(DefaultsForm().fields['def_date'].initial, datetime.date(1980, 1, 1))
