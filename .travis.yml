@@ -34,7 +34,7 @@ before_script:
 
 script:
   - cd tests
-  - PYTHONPATH=.. python -Wall runtests.py --selenium --verbosity 2 --settings=travis_configs.test_$DB\_$GIS
+  - PYTHONPATH=.. python -Wall runtests.py --selenium --verbosity 2 --settings=travis_configs.test_$DB\_$GIS transactions
 
 after_failure:
   - sudo cat /var/log/postgresql/postgresql-*-main.log
