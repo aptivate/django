@@ -32,5 +32,5 @@ echo $PATH
 
 wget -O tmp_chromedriver $CONFIG_SERVER/chromedriver
 chmod +x tmp_chromedriver
-sudo mv tmp_chromedriver /usr/local/bin/chromedriver
+sudo mv tmp_chromedriver /usr/local/bin/ChromeDriver
 sh -e /etc/init.d/xvfb start
