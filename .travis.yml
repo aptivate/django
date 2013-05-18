@@ -30,11 +30,14 @@ before_script:
   - export PIP_INDEX_URL=https://restricted.crate.io/
   - export DISPLAY=:99.0
   - export CONFIG_SERVER=http://apolloner.eu/~apollo13/django/
-  - sh ./tests/travis_configs/before_script.sh
+  - sh -x ./tests/travis_configs/before_script.sh
 
 script:
   - cd tests
   - PYTHONPATH=.. python -Wall runtests.py --selenium --verbosity 2 --settings=travis_configs.test_$DB\_$GIS
+
+after_failure:
+  - cat /var/log/postgresql/postgresql-*-main.log
 
 services:
   - memcached
@@ -56,4 +59,4 @@ branches:
   only:
     - master
     - travisci
-
+    - travisci_pgsql_crash
