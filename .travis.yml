@@ -15,11 +15,11 @@ matrix:
       env: DB=mysql
 
 env:
-  - DB=sqlite GIS=nogis
-  - DB=mysql GIS=nogis
-  - DB=mysql GIS=gis
+#  - DB=sqlite GIS=nogis
+#  - DB=mysql GIS=nogis
+#  - DB=mysql GIS=gis
   - DB=postgres GIS=nogis
-  - DB=postgres GIS=gis
+#  - DB=postgres GIS=gis
 
 install:
   - pip install -e .
