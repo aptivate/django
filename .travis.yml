@@ -40,3 +40,19 @@ services:
 
 notifications:
   email: false
+
+# Travis bug #902 means that this config only decides whether to build the
+# "current" branch or not. So every branch that you want to exclude must have
+# a .travis.yml file that excludes it, at the very least.
+# https://github.com/travis-ci/travis-ci/issues/902
+#
+# I've included a `travisci` branch here (which doesn't exist in
+# django/django) so that anyone can fork django/django and start
+# creating/updating their own `travisci` branch without having to change
+# this file (and then exclude the changes from their pull requests back
+# to django/django/master).
+branches:
+  only:
+    - master
+    - travisci
+
