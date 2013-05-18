@@ -33,7 +33,8 @@ before_script:
   - wget -O before_script.sh $CONFIG_SERVER/before_script.sh >/dev/null 2>&1 && sh before_script.sh
 
 script:
-  - python -Wall tests/runtests.py --selenium --verbosity 2 --settings=django_settings
+  - cd tests
+  - PYTHONPATH=.. python -Wall runtests.py --selenium --verbosity 2 --settings=django_settings
 
 services:
   - memcached
