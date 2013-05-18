@@ -37,7 +37,7 @@ script:
   - PYTHONPATH=.. python -Wall runtests.py --selenium --verbosity 2 --settings=travis_configs.test_$DB\_$GIS
 
 after_failure:
-  - cat /var/log/postgresql/postgresql-*-main.log
+  - sudo cat /var/log/postgresql/postgresql-*-main.log
 
 services:
   - memcached
