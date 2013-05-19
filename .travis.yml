@@ -36,8 +36,9 @@ script:
   - cd tests
 # a-m fails:  https://next.travis-ci.org/aptivate/django/jobs/7280565
 # a-j passes: https://next.travis-ci.org/aptivate/django/builds/7293704
-# f-m
-  - PYTHONPATH=..:travis_configs python -Wall runtests.py --selenium --verbosity 2 --settings=travis_configs.test_$DB\_$GIS [f-m]* transactions
+# f-m passes: https://next.travis-ci.org/aptivate/django/builds/7294056
+# c-m
+  - PYTHONPATH=..:travis_configs python -Wall runtests.py --selenium --verbosity 2 --settings=travis_configs.test_$DB\_$GIS [c-m]* transactions
 
 after_failure:
   - sudo cat /var/log/postgresql/postgresql-*-main.log
