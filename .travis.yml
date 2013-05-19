@@ -43,6 +43,11 @@ script:
 
 after_failure:
   - sudo cat /var/log/postgresql/postgresql-*-main.log
+  - df
+  - sudo sh -c 'du -sk /var/lib/postgresql/*/main'
+  - sudo sh -c 'du -sk /var/lib/postgresql/*/main/*'
+  - sudo sh -c 'ls -la /var/lib/postgresql/*/main'
+  - sudo sh -c 'ls -la /var/lib/postgresql/*/main/*'
 
 services:
   - memcached
