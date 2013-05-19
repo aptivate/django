@@ -2,11 +2,12 @@
 set -e
 
 # do we really need the latest versions of everything?
-# sudo apt-get build-dep python-imaging
 # pip install selenium pytz markdown textile docutils py-bcrypt PyYAML PIL pylibmc
 sudo apt-get install python-tz python-markdown python-textile python-docutils \
-	python-bcrypt python-yaml python-imaging python-pylibmc
-pip install selenium
+	python-bcrypt python-yaml python-pylibmc
+# there is a PIL package, but Django doesn't detect it.
+sudo apt-get build-dep python-imaging
+pip install selenium PIL
 
 if [ $DB = postgres ]
 then
