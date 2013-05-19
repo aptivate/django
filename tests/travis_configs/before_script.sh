@@ -10,8 +10,8 @@ pip install selenium
 
 if [ $DB = postgres ]
 then
-	sudo apt-get install python-psycopg2
-	# pip install psycopg2
+	# sudo apt-get install python-psycopg2 - doesn't install extensions
+	pip install psycopg2
 	TEMPLATE=template1
 	if [ $GIS = gis ]
 	then
