@@ -22,6 +22,12 @@ env:
   - DB=postgres GIS=gis
   - ONLY_DOCS=1
 
+# suggested workaround for postgres crash on Travis:
+# https://github.com/travis-ci/travis-ci/issues/1125#issuecomment-18898383
+before_install:
+  - sudo sysctl -w kernel.shmmax=268435456
+  - sudo sysctl -w kernel.shmall=268435456
+
 install:
   - pip install -e .
 
@@ -30,16 +36,20 @@ before_script:
   - export PIP_USE_MIRRORS=true
   - export PIP_INDEX_URL=https://restricted.crate.io/
   - export DISPLAY=:99.0
-  - export CONFIG_SERVER=http://apolloner.eu/~apollo13/django/
+
+  # allow Travis configs to be updated without affecting Django history:
+  - export CONFIG_REPO=${CONFIG_REPO:-https://github.com/qris/django-travis-ci.git}
+  - git clone $CONFIG_REPO tests/travis_configs
+
   # apparent workaround for postgres crash on Travis:
   # https://code.djangoproject.com/wiki/ContinuousIntegration#PostgresCrashing
   - echo 'restart_after_crash = off' | sudo tee -a /etc/postgresql/9.1/main/postgresql.conf
   - echo 'checkpoint_timeout = 30'   | sudo tee -a /etc/postgresql/9.1/main/postgresql.conf
-  - sudo /etc/init.d/postgresql stop
-  - echo "data_directory = '/var/lib/postgresql/9.1/main'" | sudo tee -a /etc/postgresql/9.1/main/postgresql.conf
-  - sudo /etc/init.d/postgresql start
-  - sudo mount -o remount,size=1G remounted /var/ramfs
-  - df
+  # - sudo /etc/init.d/postgresql stop
+  # - echo "data_directory = '/var/lib/postgresql/9.1/main'" | sudo tee -a /etc/postgresql/9.1/main/postgresql.conf
+  # - sudo /etc/init.d/postgresql start
+  # - sudo mount -o remount,size=1G remounted /var/ramfs
+  # - df
   - sh -x ./tests/travis_configs/before_script.sh
 
 script:
