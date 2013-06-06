@@ -44,13 +44,17 @@ before_script:
   # apparent workaround for postgres crash on Travis:
   # https://code.djangoproject.com/wiki/ContinuousIntegration#PostgresCrashing
   - echo 'restart_after_crash = off' | sudo tee -a /etc/postgresql/9.1/main/postgresql.conf
-  - echo 'checkpoint_timeout = 30'   | sudo tee -a /etc/postgresql/9.1/main/postgresql.conf
-  - echo 'checkpoint_segments = 1'   | sudo tee -a /etc/postgresql/9.1/main/postgresql.conf
+  # - echo 'checkpoint_timeout = 30'   | sudo tee -a /etc/postgresql/9.1/main/postgresql.conf
+  # - echo 'checkpoint_segments = 1'   | sudo tee -a /etc/postgresql/9.1/main/postgresql.conf
   - echo 'log_min_messages = info'   | sudo tee -a /etc/postgresql/9.1/main/postgresql.conf
   - echo 'log_checkpoints = on'   | sudo tee -a /etc/postgresql/9.1/main/postgresql.conf
   - echo 'log_temp_files = 1024'   | sudo tee -a /etc/postgresql/9.1/main/postgresql.conf
   - echo 'log_autovacuum_min_duration = 0'   | sudo tee -a /etc/postgresql/9.1/main/postgresql.conf
-  - sudo /etc/init.d/postgresql restart
+  - eval data_directory=`sudo awk '/data_directory/{ print $3 }' /etc/postgresql/9.1/main/postgresql.conf`
+  - sudo /etc/init.d/postgresql stop
+  - sudo mv $data_directory/pg_xlog /tmp
+  - sudo ln -s /tmp/pg_xlog $data_directory
+  - sudo /etc/init.d/postgresql start
   # - echo "data_directory = '/var/lib/postgresql/9.1/main'" | sudo tee -a /etc/postgresql/9.1/main/postgresql.conf
   # - sudo /etc/init.d/postgresql start
   # - sudo mount -o remount,size=1G remounted /var/ramfs
