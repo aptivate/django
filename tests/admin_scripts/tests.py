@@ -888,18 +888,16 @@ class ManageAlternateSettings(AdminScriptTestCase):
         "alternate: manage.py builtin commands work with settings provided as argument"
         args = ['sqlall', '--settings=alternate_settings', 'admin_scripts']
         out, err = self.run_manage(args)
-        expected = ('create table %s'
-                    % connection.ops.quote_name('admin_scripts_article'))
-        self.assertTrue(expected.lower() in out.lower())
+        self.assertTrue(re.search('create .*table %s' % 
+            connection.ops.quote_name('admin_scripts_article'), out.lower()))
         self.assertNoOutput(err)
 
     def test_builtin_with_environment(self):
         "alternate: manage.py builtin commands work if settings are provided in the environment"
         args = ['sqlall', 'admin_scripts']
         out, err = self.run_manage(args, 'alternate_settings')
-        expected = ('create table %s'
-                    % connection.ops.quote_name('admin_scripts_article'))
-        self.assertTrue(expected.lower() in out.lower())
+        self.assertTrue(re.search('create .*table %s' % 
+            connection.ops.quote_name('admin_scripts_article'), out.lower()))
         self.assertNoOutput(err)
 
     def test_builtin_with_bad_settings(self):
