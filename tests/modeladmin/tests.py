@@ -64,6 +64,30 @@ class ModelAdminTests(TestCase):
         self.assertEqual(ma.get_fieldsets(request, self.band),
             [(None, {'fields': ['name', 'bio', 'sign_date']})])
 
+    def test_get_fieldsets(self):
+        # Test that get_fieldsets is called when figuring out form fields.
+        # Refs #18681.
+
+        class BandAdmin(ModelAdmin):
+            def get_fieldsets(self, request, obj=None):
+                return [(None, {'fields': ['name', 'bio']})]
+
+        ma = BandAdmin(Band, self.site)
+        form = ma.get_form(None)
+        self.assertEqual(form._meta.fields, ['name', 'bio'])
+
+        class InlineBandAdmin(TabularInline):
+            model = Concert
+            fk_name = 'main_band'
+            can_delete = False
+
+            def get_fieldsets(self, request, obj=None):
+                return [(None, {'fields': ['day', 'transport']})]
+
+        ma = InlineBandAdmin(Band, self.site)
+        form = ma.get_formset(None).form
+        self.assertEqual(form._meta.fields, ['day', 'transport'])
+
     def test_field_arguments(self):
         # If we specify the fields argument, fieldsets_add and fielsets_change should
         # just stick the fields into a formsets structure and return it.
@@ -1137,9 +1161,11 @@ class ValidationTests(unittest.TestCase):
         class ValidationTestModelAdmin(ModelAdmin):
             list_select_related = 1
 
-        six.assertRaisesRegex(self,
+        six.assertRaisesRegex(
+            self,
             ImproperlyConfigured,
-            "'ValidationTestModelAdmin.list_select_related' should be a bool.",
+            "'ValidationTestModelAdmin.list_select_related' should be either a "
+            "bool, a tuple or a list",
             ValidationTestModelAdmin.validate,
             ValidationTestModel,
         )

@@ -201,7 +201,9 @@ class SingleRelatedObjectDescriptor(six.with_metaclass(RenameRelatedObjectDescri
                     setattr(rel_obj, self.related.field.get_cache_name(), instance)
             setattr(instance, self.cache_name, rel_obj)
         if rel_obj is None:
-            raise self.related.model.DoesNotExist
+            raise self.related.model.DoesNotExist("%s has no %s." % (
+                                                  instance.__class__.__name__,
+                                                  self.related.get_accessor_name()))
         else:
             return rel_obj
 
@@ -226,8 +228,7 @@ class SingleRelatedObjectDescriptor(six.with_metaclass(RenameRelatedObjectDescri
                 value._state.db = router.db_for_write(value.__class__, instance=instance)
             elif value._state.db is not None and instance._state.db is not None:
                 if not router.allow_relation(value, instance):
-                    raise ValueError('Cannot assign "%r": instance is on database "%s", value is on database "%s"' %
-                                        (value, instance._state.db, value._state.db))
+                    raise ValueError('Cannot assign "%r": the current database router prevents this relation.' % value)
 
         related_pk = tuple([getattr(instance, field.attname) for field in self.related.field.foreign_related_fields])
         if None in related_pk:
@@ -304,7 +305,8 @@ class ReverseSingleRelatedObjectDescriptor(six.with_metaclass(RenameRelatedObjec
                     setattr(rel_obj, self.field.related.get_cache_name(), instance)
             setattr(instance, self.cache_name, rel_obj)
         if rel_obj is None and not self.field.null:
-            raise self.field.rel.to.DoesNotExist
+            raise self.field.rel.to.DoesNotExist(
+                "%s has no %s." % (self.field.model.__name__, self.field.name))
         else:
             return rel_obj
 
@@ -325,8 +327,7 @@ class ReverseSingleRelatedObjectDescriptor(six.with_metaclass(RenameRelatedObjec
                 value._state.db = router.db_for_write(value.__class__, instance=instance)
             elif value._state.db is not None and instance._state.db is not None:
                 if not router.allow_relation(value, instance):
-                    raise ValueError('Cannot assign "%r": instance is on database "%s", value is on database "%s"' %
-                                        (value, instance._state.db, value._state.db))
+                    raise ValueError('Cannot assign "%r": the current database router prevents this relation.' % value)
 
         # If we're setting the value of a OneToOneField to None, we need to clear
         # out the cache on any old related object. Otherwise, deleting the

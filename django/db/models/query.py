@@ -125,7 +125,7 @@ class QuerySet(object):
             else:
                 stop = None
             qs.query.set_limits(start, stop)
-            return k.step and list(qs)[::k.step] or qs
+            return list(qs)[::k.step] if k.step else qs
 
         qs = self._clone()
         qs.query.set_limits(k, k + 1)
@@ -363,8 +363,6 @@ class QuerySet(object):
         Returns a tuple of (object, created), where created is a boolean
         specifying whether an object was created.
         """
-        assert kwargs, \
-                'get_or_create() must be passed at least one keyword argument'
         defaults = kwargs.pop('defaults', {})
         lookup = kwargs.copy()
         for f in self.model._meta.fields:
@@ -647,6 +645,8 @@ class QuerySet(object):
 
         If fields are specified, they must be ForeignKey fields and only those
         related objects are included in the selection.
+
+        If select_related(None) is called, the list is cleared.
         """
         if 'depth' in kwargs:
             warnings.warn('The "depth" keyword argument has been deprecated.\n'
@@ -656,7 +656,9 @@ class QuerySet(object):
             raise TypeError('Unexpected keyword arguments to select_related: %s'
                     % (list(kwargs),))
         obj = self._clone()
-        if fields:
+        if fields == (None,):
+            obj.query.select_related = False
+        elif fields:
             if depth:
                 raise TypeError('Cannot pass both "depth" and fields to select_related()')
             obj.query.add_select_related(fields)

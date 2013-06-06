@@ -696,7 +696,7 @@ Use the ``django.test.client.Client`` class to make requests.
 
         After you call this method, the test client will have all the cookies
         and session data cleared to defaults. Subsequent requests will appear
-        to come from an AnonymousUser.
+        to come from an :class:`~django.contrib.auth.models.AnonymousUser`.
 
 Testing responses
 ~~~~~~~~~~~~~~~~~
@@ -953,7 +953,7 @@ to test the effects of commit and rollback:
     key values started at one in :class:`~django.test.TransactionTestCase`
     tests.
 
-    Tests should not depend on this behaviour, but for legacy tests that do, the
+    Tests should not depend on this behavior, but for legacy tests that do, the
     :attr:`~TransactionTestCase.reset_sequences` attribute can be used until
     the test has been properly updated.
 
@@ -1524,6 +1524,27 @@ your test suite.
 
     ``form`` is the name the ``Form`` instance was given in the template
     context.
+
+    ``field`` is the name of the field on the form to check. If ``field``
+    has a value of ``None``, non-field errors (errors you can access via
+    ``form.non_field_errors()``) will be checked.
+
+    ``errors`` is an error string, or a list of error strings, that are
+    expected as a result of form validation.
+
+.. method:: SimpleTestCase.assertFormsetError(response, formset, form_index, field, errors, msg_prefix='')
+
+    .. versionadded:: 1.6
+
+    Asserts that the ``formset`` raises the provided list of errors when
+    rendered.
+
+    ``formset`` is the name the ``Formset`` instance was given in the template
+    context.
+
+    ``form_index`` is the number of the form within the ``Formset``.  If
+    ``form_index`` has a value of ``None``, non-form errors (errors you can
+    access via ``formset.non_form_errors()``) will be checked.
 
     ``field`` is the name of the field on the form to check. If ``field``
     has a value of ``None``, non-field errors (errors you can access via

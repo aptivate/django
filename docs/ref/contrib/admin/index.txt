@@ -812,12 +812,24 @@ subclass::
     the list of objects on the admin change list page. This can save you a
     bunch of database queries.
 
-    The value should be either ``True`` or ``False``. Default is ``False``.
+    .. versionchanged:: dev
 
-    Note that Django will use
-    :meth:`~django.db.models.query.QuerySet.select_related`,
-    regardless of this setting if one of the ``list_display`` fields is a
-    ``ForeignKey``.
+    The value should be either a boolean, a list or a tuple. Default is
+    ``False``.
+
+    When value is ``True``, ``select_related()`` will always be called. When
+    value is set to ``False``, Django will look at ``list_display`` and call
+    ``select_related()`` if any ``ForeignKey`` is present.
+
+    If you need more fine-grained control, use a tuple (or list) as value for
+    ``list_select_related``. Empty tuple will prevent Django from calling
+    ``select_related`` at all. Any other tuple will be passed directly to
+    ``select_related`` as parameters. For example::
+
+        class ArticleAdmin(admin.ModelAdmin):
+            list_select_related = ('author', 'category')
+
+    will call ``select_related('author', 'category')``.
 
 .. attribute:: ModelAdmin.ordering
 
@@ -1026,8 +1038,9 @@ subclass::
         Performs a full-text match. This is like the default search method but
         uses an index. Currently this is only available for MySQL.
 
-    If you need to customize search you can use :meth:`ModelAdmin.get_search_results` to provide additional or alternate
-    search behaviour.
+    If you need to customize search you can use
+    :meth:`ModelAdmin.get_search_results` to provide additional or alternate
+    search behavior.
 
 Custom template options
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -1715,6 +1728,11 @@ The ``InlineModelAdmin`` class adds:
     The dynamic link will not appear if the number of currently displayed forms
     exceeds ``max_num``, or if the user does not have JavaScript enabled.
 
+    .. versionadded:: 1.6
+
+    :meth:`InlineModelAdmin.get_extra` also allows you to customize the number
+    of extra forms.
+
     .. _ref-contrib-admin-inline-max-num:
 
 .. attribute:: InlineModelAdmin.max_num
@@ -1722,6 +1740,11 @@ The ``InlineModelAdmin`` class adds:
     This controls the maximum number of forms to show in the inline. This
     doesn't directly correlate to the number of objects, but can if the value
     is small enough. See :ref:`model-formsets-max-num` for more information.
+
+    .. versionadded:: 1.6
+
+    :meth:`InlineModelAdmin.get_max_num` also allows you to customize the
+    maximum number of extra forms.
 
 .. attribute:: InlineModelAdmin.raw_id_fields
 
@@ -1761,6 +1784,47 @@ The ``InlineModelAdmin`` class adds:
 
     Returns a ``BaseInlineFormSet`` class for use in admin add/change views.
     See the example for :class:`ModelAdmin.get_formsets`.
+
+.. method:: InlineModelAdmin.get_extra(self, request, obj=None, **kwargs)
+
+    .. versionadded:: 1.6
+
+    Returns the number of extra inline forms to use. By default, returns the
+    :attr:`InlineModelAdmin.extra` attribute.
+
+    Override this method to programmatically determine the number of extra
+    inline forms. For example, this may be based on the model instance
+    (passed as the keyword argument ``obj``)::
+
+        class BinaryTreeAdmin(admin.TabularInline):
+            model = BinaryTree
+
+            def get_extra(self, request, obj=None, **kwargs):
+                extra = 2
+                if obj:
+                    return extra - obj.binarytree_set.count()
+                return extra
+
+.. method:: InlineModelAdmin.get_max_num(self, request, obj=None, **kwargs)
+
+    .. versionadded:: 1.6
+
+    Returns the maximum number of extra inline forms to use. By default,
+    returns the :attr:`InlineModelAdmin.max_num` attribute.
+
+    Override this method to programmatically determine the maximum number of
+    inline forms. For example, this may be based on the model instance
+    (passed as the keyword argument ``obj``)::
+
+        class BinaryTreeAdmin(admin.TabularInline):
+            model = BinaryTree
+
+            def get_max_num(self, request, obj=None, **kwargs):
+                max_num = 10
+                if obj.parent:
+                    return max_num - 5
+                return max_num
+
 
 Working with a model with two or more foreign keys to the same parent model
 ---------------------------------------------------------------------------

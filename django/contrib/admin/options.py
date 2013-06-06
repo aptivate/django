@@ -24,6 +24,7 @@ from django.db.models.related import RelatedObject
 from django.db.models.fields import BLANK_CHOICE_DASH, FieldDoesNotExist
 from django.db.models.sql.constants import QUERY_TERMS
 from django.http import Http404, HttpResponse, HttpResponseRedirect
+from django.http.response import HttpResponseBase
 from django.shortcuts import get_object_or_404
 from django.template.response import SimpleTemplateResponse, TemplateResponse
 from django.utils.decorators import method_decorator
@@ -497,7 +498,7 @@ class ModelAdmin(BaseModelAdmin):
         "Hook for specifying fieldsets for the add form."
         if self.declared_fieldsets:
             return self.declared_fieldsets
-        form = self.get_form(request, obj)
+        form = self.get_form(request, obj, fields=None)
         fields = list(form.base_fields) + list(self.get_readonly_fields(request, obj))
         return [(None, {'fields': fields})]
 
@@ -506,10 +507,10 @@ class ModelAdmin(BaseModelAdmin):
         Returns a Form class for use in the admin add view. This is used by
         add_view and change_view.
         """
-        if self.declared_fieldsets:
-            fields = flatten_fieldsets(self.declared_fieldsets)
+        if 'fields' in kwargs:
+            fields = kwargs.pop('fields')
         else:
-            fields = None
+            fields = flatten_fieldsets(self.get_fieldsets(request, obj))
         if self.exclude is None:
             exclude = []
         else:
@@ -1026,10 +1027,10 @@ class ModelAdmin(BaseModelAdmin):
 
             response = func(self, request, queryset)
 
-            # Actions may return an HttpResponse, which will be used as the
-            # response from the POST. If not, we'll be a good little HTTP
-            # citizen and redirect back to the changelist page.
-            if isinstance(response, HttpResponse):
+            # Actions may return an HttpResponse-like object, which will be
+            # used as the response from the POST. If not, we'll be a good
+            # little HTTP citizen and redirect back to the changelist page.
+            if isinstance(response, HttpResponseBase):
                 return response
             else:
                 return HttpResponseRedirect(request.get_full_path())
@@ -1511,12 +1512,20 @@ class InlineModelAdmin(BaseModelAdmin):
             js.extend(['SelectBox.js', 'SelectFilter2.js'])
         return forms.Media(js=[static('admin/js/%s' % url) for url in js])
 
+    def get_extra(self, request, obj=None, **kwargs):
+        """Hook for customizing the number of extra inline forms."""
+        return self.extra
+
+    def get_max_num(self, request, obj=None, **kwargs):
+        """Hook for customizing the max number of extra inline forms."""
+        return self.max_num
+
     def get_formset(self, request, obj=None, **kwargs):
         """Returns a BaseInlineFormSet class for use in admin add/change views."""
-        if self.declared_fieldsets:
-            fields = flatten_fieldsets(self.declared_fieldsets)
+        if 'fields' in kwargs:
+            fields = kwargs.pop('fields')
         else:
-            fields = None
+            fields = flatten_fieldsets(self.get_fieldsets(request, obj))
         if self.exclude is None:
             exclude = []
         else:
@@ -1537,8 +1546,8 @@ class InlineModelAdmin(BaseModelAdmin):
             "fields": fields,
             "exclude": exclude,
             "formfield_callback": partial(self.formfield_for_dbfield, request=request),
-            "extra": self.extra,
-            "max_num": self.max_num,
+            "extra": self.get_extra(request, obj, **kwargs),
+            "max_num": self.get_max_num(request, obj, **kwargs),
             "can_delete": can_delete,
         }
 
@@ -1588,7 +1597,7 @@ class InlineModelAdmin(BaseModelAdmin):
     def get_fieldsets(self, request, obj=None):
         if self.declared_fieldsets:
             return self.declared_fieldsets
-        form = self.get_formset(request, obj).form
+        form = self.get_formset(request, obj, fields=None).form
         fields = list(form.base_fields) + list(self.get_readonly_fields(request, obj))
         return [(None, {'fields': fields})]
 

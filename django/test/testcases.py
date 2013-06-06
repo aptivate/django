@@ -30,12 +30,11 @@ from django.core.urlresolvers import clear_url_caches, set_urlconf
 from django.db import connection, connections, DEFAULT_DB_ALIAS, transaction
 from django.forms.fields import CharField
 from django.http import QueryDict
-from django.test import _doctest as doctest
 from django.test.client import Client
 from django.test.html import HTMLParseError, parse_html
 from django.test.signals import template_rendered
 from django.test.utils import (CaptureQueriesContext, ContextList,
-    override_settings, compare_xml, strip_quotes)
+    override_settings, compare_xml)
 from django.utils import six, unittest as ut2
 from django.utils.encoding import force_text
 from django.utils.unittest import skipIf # Imported here for backward compatibility
@@ -43,13 +42,8 @@ from django.utils.unittest.util import safe_repr
 from django.views.static import serve
 
 
-__all__ = ('DocTestRunner', 'OutputChecker', 'TestCase', 'TransactionTestCase',
+__all__ = ('TestCase', 'TransactionTestCase',
            'SimpleTestCase', 'skipIfDBFeature', 'skipUnlessDBFeature')
-
-
-normalize_long_ints = lambda s: re.sub(r'(?<![\w])(\d+)L(?![\w])', '\\1', s)
-normalize_decimals = lambda s: re.sub(r"Decimal\('(\d+(\.\d*)?)'\)",
-                                lambda m: "Decimal(\"%s\")" % m.groups()[0], s)
 
 
 def to_list(value):
@@ -94,75 +88,6 @@ def assert_and_parse_html(self, html, user_msg, msg):
         standardMsg = '%s\n%s' % (msg, e.msg)
         self.fail(self._formatMessage(user_msg, standardMsg))
     return dom
-
-
-class OutputChecker(doctest.OutputChecker):
-    def __init__(self):
-        warnings.warn(
-            "The django.test.testcases.OutputChecker class is deprecated; "
-            "use the doctest module from the Python standard library instead.",
-            PendingDeprecationWarning)
-
-    def check_output(self, want, got, optionflags):
-        """
-        The entry method for doctest output checking. Defers to a sequence of
-        child checkers
-        """
-        checks = (self.check_output_default,
-                  self.check_output_numeric,
-                  self.check_output_xml,
-                  self.check_output_json)
-        for check in checks:
-            if check(want, got, optionflags):
-                return True
-        return False
-
-    def check_output_default(self, want, got, optionflags):
-        """
-        The default comparator provided by doctest - not perfect, but good for
-        most purposes
-        """
-        return doctest.OutputChecker.check_output(self, want, got, optionflags)
-
-    def check_output_numeric(self, want, got, optionflags):
-        """Doctest does an exact string comparison of output, which means that
-        some numerically equivalent values aren't equal. This check normalizes
-         * long integers (22L) so that they equal normal integers. (22)
-         * Decimals so that they are comparable, regardless of the change
-           made to __repr__ in Python 2.6.
-        """
-        return doctest.OutputChecker.check_output(self,
-            normalize_decimals(normalize_long_ints(want)),
-            normalize_decimals(normalize_long_ints(got)),
-            optionflags)
-
-    def check_output_xml(self, want, got, optionsflags):
-        try:
-            return compare_xml(want, got)
-        except Exception:
-            return False
-
-    def check_output_json(self, want, got, optionsflags):
-        """
-        Tries to compare want and got as if they were JSON-encoded data
-        """
-        want, got = strip_quotes(want, got)
-        try:
-            want_json = json.loads(want)
-            got_json = json.loads(got)
-        except Exception:
-            return False
-        return want_json == got_json
-
-
-class DocTestRunner(doctest.DocTestRunner):
-    def __init__(self, *args, **kwargs):
-        warnings.warn(
-            "The django.test.testcases.DocTestRunner class is deprecated; "
-            "use the doctest module from the Python standard library instead.",
-            PendingDeprecationWarning)
-        doctest.DocTestRunner.__init__(self, *args, **kwargs)
-        self.optionflags = doctest.ELLIPSIS
 
 
 class _AssertNumQueriesContext(CaptureQueriesContext):
@@ -508,6 +433,83 @@ class SimpleTestCase(ut2.TestCase):
         if not found_form:
             self.fail(msg_prefix + "The form '%s' was not used to render the"
                       " response" % form)
+
+    def assertFormsetError(self, response, formset, form_index, field, errors,
+                           msg_prefix=''):
+        """
+        Asserts that a formset used to render the response has a specific error.
+
+        For field errors, specify the ``form_index`` and the ``field``.
+        For non-field errors, specify the ``form_index`` and the ``field`` as
+        None.
+        For non-form errors, specify ``form_index`` as None and the ``field``
+        as None.
+        """
+        # Add punctuation to msg_prefix
+        if msg_prefix:
+            msg_prefix += ": "
+
+        # Put context(s) into a list to simplify processing.
+        contexts = to_list(response.context)
+        if not contexts:
+            self.fail(msg_prefix + 'Response did not use any contexts to '
+                      'render the response')
+
+        # Put error(s) into a list to simplify processing.
+        errors = to_list(errors)
+
+        # Search all contexts for the error.
+        found_formset = False
+        for i, context in enumerate(contexts):
+            if formset not in context:
+                continue
+            found_formset = True
+            for err in errors:
+                if field is not None:
+                    if field in context[formset].forms[form_index].errors:
+                        field_errors = context[formset].forms[form_index].errors[field]
+                        self.assertTrue(err in field_errors,
+                                msg_prefix + "The field '%s' on formset '%s', "
+                                "form %d in context %d does not contain the "
+                                "error '%s' (actual errors: %s)" %
+                                        (field, formset, form_index, i, err,
+                                        repr(field_errors)))
+                    elif field in context[formset].forms[form_index].fields:
+                        self.fail(msg_prefix + "The field '%s' "
+                                  "on formset '%s', form %d in "
+                                  "context %d contains no errors" %
+                                        (field, formset, form_index, i))
+                    else:
+                        self.fail(msg_prefix + "The formset '%s', form %d in "
+                                 "context %d does not contain the field '%s'" %
+                                        (formset, form_index, i, field))
+                elif form_index is not None:
+                    non_field_errors = context[formset].forms[form_index].non_field_errors()
+                    self.assertFalse(len(non_field_errors) == 0,
+                                msg_prefix + "The formset '%s', form %d in "
+                                "context %d does not contain any non-field "
+                                "errors." % (formset, form_index, i))
+                    self.assertTrue(err in non_field_errors,
+                                    msg_prefix + "The formset '%s', form %d "
+                                    "in context %d does not contain the "
+                                    "non-field error '%s' "
+                                    "(actual errors: %s)" %
+                                        (formset, form_index, i, err,
+                                         repr(non_field_errors)))
+                else:
+                    non_form_errors = context[formset].non_form_errors()
+                    self.assertFalse(len(non_form_errors) == 0,
+                                     msg_prefix + "The formset '%s' in "
+                                     "context %d does not contain any "
+                                     "non-form errors." % (formset, i))
+                    self.assertTrue(err in non_form_errors,
+                                    msg_prefix + "The formset '%s' in context "
+                                    "%d does not contain the "
+                                    "non-form error '%s' (actual errors: %s)" %
+                                      (formset, i, err, repr(non_form_errors)))
+        if not found_formset:
+            self.fail(msg_prefix + "The formset '%s' was not used to render "
+                      "the response" % formset)
 
     def assertTemplateUsed(self, response=None, template_name=None, msg_prefix=''):
         """
