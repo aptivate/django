@@ -77,7 +77,7 @@ class PostGISCreation(DatabaseCreation):
                               style.SQL_FIELD(qn(f.column)) + index_ops + ' );')
         return output
 
-    def sql_table_creation_suffix(self):
+    def sql_test_database_creation_suffix(self):
         if self.template_postgis is not None:
             return ' TEMPLATE %s' % (
                 self.connection.ops.quote_name(self.template_postgis),)

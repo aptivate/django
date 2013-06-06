@@ -375,9 +375,9 @@ class BaseDatabaseCreation(object):
 
     def _create_test_db(self, verbosity, autoclobber):
         """
-        Internal implementation - creates the test db tables.
+        Internal implementation - creates the test database.
         """
-        suffix = self.sql_table_creation_suffix()
+        suffix = self.sql_test_database_creation_suffix()
 
         test_database_name = self._get_test_db_name()
 
@@ -468,9 +468,9 @@ class BaseDatabaseCreation(object):
             "BaseDatabaseWrapper.", PendingDeprecationWarning, stacklevel=2)
         return self.connection.set_autocommit(True)
 
-    def sql_table_creation_suffix(self):
+    def sql_test_database_creation_suffix(self):
         """
-        SQL to append to the end of the test table creation statements.
+        SQL to append to the end of the test database CREATE DATABASE statements.
         """
         return ''
 
