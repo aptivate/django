@@ -31,7 +31,7 @@ class DatabaseCreation(BaseDatabaseCreation):
         'TimeField':         'time',
     }
 
-    def sql_table_creation_suffix(self):
+    def sql_test_database_creation_suffix(self):
         suffix = []
         if self.connection.settings_dict['TEST_CHARSET']:
             suffix.append('CHARACTER SET %s' % self.connection.settings_dict['TEST_CHARSET'])
