@@ -35,6 +35,15 @@ class DatabaseCreation(BaseDatabaseCreation):
         'TimeField':         'time',
     }
 
+    def sql_create_table_prefixes(self, model, style):
+        qn = self.connection.ops.quote_name
+        opts = model._meta
+        # The TABLE_TYPE option allows us to CREATE UNLOGGED TABLE for
+        # faster test runs on Postgres.
+        table_type = self.connection.settings_dict.get('TABLE_TYPE', '')
+        return [style.SQL_KEYWORD('CREATE %s TABLE' % table_type) + ' ' +
+                style.SQL_TABLE(qn(opts.db_table))]
+
     def sql_test_database_creation_suffix(self):
         assert self.connection.settings_dict['TEST_COLLATION'] is None, "PostgreSQL does not support collation setting at database creation time."
         if self.connection.settings_dict['TEST_CHARSET']:
