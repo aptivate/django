@@ -50,7 +50,7 @@ before_script:
   - echo 'log_checkpoints = on'   | sudo tee -a /etc/postgresql/9.1/main/postgresql.conf
   - echo 'log_temp_files = 1024'   | sudo tee -a /etc/postgresql/9.1/main/postgresql.conf
   - echo 'log_autovacuum_min_duration = 0'   | sudo tee -a /etc/postgresql/9.1/main/postgresql.conf
-  # - sudo /etc/init.d/postgresql stop
+  - sudo /etc/init.d/postgresql restart
   # - echo "data_directory = '/var/lib/postgresql/9.1/main'" | sudo tee -a /etc/postgresql/9.1/main/postgresql.conf
   # - sudo /etc/init.d/postgresql start
   # - sudo mount -o remount,size=1G remounted /var/ramfs
