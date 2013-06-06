@@ -1,5 +1,7 @@
 from __future__ import unicode_literals
 
+import re
+
 from django.core.management.color import no_style
 from django.core.management.sql import (sql_create, sql_delete, sql_indexes,
     sql_destroy_indexes, sql_all)
@@ -18,11 +20,15 @@ class SQLCommandsTestCase(TestCase):
     def test_sql_create(self):
         app = models.get_app('commands_sql')
         output = sql_create(app, no_style(), connections[DEFAULT_DB_ALIAS])
-        create_tables = [o for o in output if o.startswith('CREATE TABLE')]
-        self.assertEqual(len(create_tables), 3)
+
+        create_tables = [o for o in output
+            if re.match(r'CREATE .*TABLE .*', o)]
+        self.assertEqual(len(create_tables), 3, "Was expecting 3 "
+            "CREATE TABLE statements, but found: %s" % create_tables)
+
         # Lower so that Oracle's upper case tbl names wont break
         sql = create_tables[-1].lower()
-        six.assertRegex(self, sql, r'^create table .commands_sql_book.*')
+        six.assertRegex(self, sql, r'^create .*table .commands_sql_book.*')
 
     def test_sql_delete(self):
         app = models.get_app('commands_sql')
@@ -49,6 +55,9 @@ class SQLCommandsTestCase(TestCase):
         app = models.get_app('commands_sql')
         output = sql_all(app, no_style(), connections[DEFAULT_DB_ALIAS])
 
-        self.assertEqual(self.count_ddl(output, 'CREATE TABLE'), 3)
+        create_tables = [o for o in output
+            if re.match(r'CREATE .*TABLE .*', o)]
+        self.assertEqual(len(create_tables), 3, "Was expecting 3 "
+            "CREATE TABLE statements, but found: %s" % create_tables)
         # PostgreSQL creates one additional index for CharField
         self.assertIn(self.count_ddl(output, 'CREATE INDEX'), [3, 4])

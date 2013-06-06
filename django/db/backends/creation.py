@@ -37,6 +37,88 @@ class BaseDatabaseCreation(object):
             h.update(force_bytes(arg))
         return h.hexdigest()[:8]
 
+    def sql_create_field(self, model, field, style, known_models,
+        pending_references):
+
+        opts = model._meta
+        qn = self.connection.ops.quote_name
+
+        col_type = field.db_type(connection=self.connection)
+        tablespace = field.db_tablespace or opts.db_tablespace
+        if col_type is None:
+            # Skip ManyToManyFields, because they're not represented as
+            # database columns in this table.
+            return None
+
+        # Make the definition (e.g. 'foo VARCHAR(30)') for this field.
+        field_output = [style.SQL_FIELD(qn(field.column)),
+            style.SQL_COLTYPE(col_type)]
+
+        # Oracle treats the empty string ('') as null, so coerce the null
+        # option whenever '' is a possible value.
+        nullable = field.null
+        if (field.empty_strings_allowed and not field.primary_key and
+                self.connection.features.interprets_empty_strings_as_nulls):
+            nullable = True
+        if not nullable:
+            field_output.append(style.SQL_KEYWORD('NOT NULL'))
+        if field.primary_key:
+            field_output.append(style.SQL_KEYWORD('PRIMARY KEY'))
+        elif field.unique:
+            field_output.append(style.SQL_KEYWORD('UNIQUE'))
+
+        if tablespace and field.unique:
+            # We must specify the index tablespace inline, because we
+            # won't be generating a CREATE INDEX statement for this field.
+            tablespace_sql = self.connection.ops.tablespace_sql(
+                tablespace, inline=True)
+            if tablespace_sql:
+                field_output.append(tablespace_sql)
+
+        if field.rel and field.db_constraint:
+            ref_output, pending = self.sql_for_inline_foreign_key_references(
+                model, field, known_models, style)
+            if pending:
+                pending_references.setdefault(field.rel.to, []).append(
+                    (model, field))
+            else:
+                field_output.extend(ref_output)
+
+        return field_output
+
+    def sql_create_table_prefixes(self, model, style):
+        qn = self.connection.ops.quote_name
+        opts = model._meta
+        return [style.SQL_KEYWORD('CREATE TABLE') + ' ' +
+                style.SQL_TABLE(qn(opts.db_table))]
+
+    def sql_create_table_suffixes(self, model):
+        opts = model._meta
+        if opts.db_tablespace:
+            tablespace_sql = self.connection.ops.tablespace_sql(
+                opts.db_tablespace)
+            if tablespace_sql:
+                return [tablespace_sql]
+        return []
+
+    def sql_create_table(self, model, fields_sql, constraints_sql, style):
+        """
+        Returns a CREATE TABLE statement for a model, given a list of
+        fields and constraints already in SQL.
+        """
+        opts = model._meta
+        full_statement = self.sql_create_table_prefixes(model, style)
+        full_statement.append(' (')
+
+        # Combine and add commas.
+        full_statement.append(",".join(
+            ['    ' + line for line in (fields_sql + constraints_sql)]))
+
+        full_statement.append(')')
+        full_statement.extend(self.sql_create_table_suffixes(model))
+        full_statement.append(';')
+        return full_statement
+
     def sql_create_model(self, model, style, known_models=set()):
         """
         Returns the SQL required to create a single model, as a tuple of:
@@ -49,62 +131,23 @@ class BaseDatabaseCreation(object):
         table_output = []
         pending_references = {}
         qn = self.connection.ops.quote_name
-        for f in opts.local_fields:
-            col_type = f.db_type(connection=self.connection)
-            tablespace = f.db_tablespace or opts.db_tablespace
-            if col_type is None:
-                # Skip ManyToManyFields, because they're not represented as
-                # database columns in this table.
-                continue
-            # Make the definition (e.g. 'foo VARCHAR(30)') for this field.
-            field_output = [style.SQL_FIELD(qn(f.column)),
-                style.SQL_COLTYPE(col_type)]
-            # Oracle treats the empty string ('') as null, so coerce the null
-            # option whenever '' is a possible value.
-            null = f.null
-            if (f.empty_strings_allowed and not f.primary_key and
-                    self.connection.features.interprets_empty_strings_as_nulls):
-                null = True
-            if not null:
-                field_output.append(style.SQL_KEYWORD('NOT NULL'))
-            if f.primary_key:
-                field_output.append(style.SQL_KEYWORD('PRIMARY KEY'))
-            elif f.unique:
-                field_output.append(style.SQL_KEYWORD('UNIQUE'))
-            if tablespace and f.unique:
-                # We must specify the index tablespace inline, because we
-                # won't be generating a CREATE INDEX statement for this field.
-                tablespace_sql = self.connection.ops.tablespace_sql(
-                    tablespace, inline=True)
-                if tablespace_sql:
-                    field_output.append(tablespace_sql)
-            if f.rel and f.db_constraint:
-                ref_output, pending = self.sql_for_inline_foreign_key_references(
-                    model, f, known_models, style)
-                if pending:
-                    pending_references.setdefault(f.rel.to, []).append(
-                        (model, f))
-                else:
-                    field_output.extend(ref_output)
-            table_output.append(' '.join(field_output))
+
+        fields_sql = []
+        for field in opts.local_fields:
+            field_output = self.sql_create_field(model, field, style,
+                known_models, pending_references)
+            if field_output is not None:
+                fields_sql.append(' '.join(field_output))
+
+        constraints_sql = []
         for field_constraints in opts.unique_together:
-            table_output.append(style.SQL_KEYWORD('UNIQUE') + ' (%s)' %
-                ", ".join(
+            constraints_sql.append(style.SQL_KEYWORD('UNIQUE') + 
+                ' (%s)' % ", ".join(
                     [style.SQL_FIELD(qn(opts.get_field(f).column))
                      for f in field_constraints]))
 
-        full_statement = [style.SQL_KEYWORD('CREATE TABLE') + ' ' +
-                          style.SQL_TABLE(qn(opts.db_table)) + ' (']
-        for i, line in enumerate(table_output):  # Combine and add commas.
-            full_statement.append(
-                '    %s%s' % (line, ',' if i < len(table_output) - 1 else ''))
-        full_statement.append(')')
-        if opts.db_tablespace:
-            tablespace_sql = self.connection.ops.tablespace_sql(
-                opts.db_tablespace)
-            if tablespace_sql:
-                full_statement.append(tablespace_sql)
-        full_statement.append(';')
+        full_statement = self.sql_create_table(model, fields_sql,
+                                               constraints_sql, style)
         final_output.append('\n'.join(full_statement))
 
         if opts.has_auto_field:
