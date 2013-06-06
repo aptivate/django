@@ -87,6 +87,7 @@ class BaseDatabaseCreation(object):
         return field_output
 
     def sql_create_table_prefixes(self, model, style):
+        qn = self.connection.ops.quote_name
         opts = model._meta
         return [style.SQL_KEYWORD('CREATE TABLE') + ' ' +
                 style.SQL_TABLE(qn(opts.db_table))]
