@@ -36,12 +36,13 @@ def delete_selected(modeladmin, request, queryset):
     deletable_objects, perms_needed, protected = get_deleted_objects(
         queryset, opts, request.user, modeladmin.admin_site, using)
 
+    n = queryset.count()
+
     # The user has already confirmed the deletion.
     # Do the deletion and return a None to display the change list view again.
     if request.POST.get('post'):
         if perms_needed:
             raise PermissionDenied
-        n = queryset.count()
         if n:
             for obj in queryset:
                 obj_display = force_text(obj)
@@ -53,7 +54,7 @@ def delete_selected(modeladmin, request, queryset):
         # Return None to display the change list page again.
         return None
 
-    if len(queryset) == 1:
+    if n == 1:
         objects_name = force_text(opts.verbose_name)
     else:
         objects_name = force_text(opts.verbose_name_plural)

@@ -558,7 +558,7 @@ class BaseModelFormSet(BaseFormSet):
     def initial_form_count(self):
         """Returns the number of forms that are required in this FormSet."""
         if not (self.data or self.files):
-            return len(self.get_queryset())
+            return self.queryset.count()
         return super(BaseModelFormSet, self).initial_form_count()
 
     def _existing_object(self, pk):
@@ -1073,7 +1073,7 @@ class ModelChoiceIterator(object):
                 yield self.choice(obj)
 
     def __len__(self):
-        return (len(self.queryset) +
+        return (self.queryset.count() +
             (1 if self.field.empty_label is not None else 0))
 
     def choice(self, obj):
