@@ -1007,10 +1007,10 @@ class CharField(Field):
 
     def check(self, **kwargs):
         errors = super(CharField, self).check(**kwargs)
-        errors.extend(self._check_max_length_attibute(**kwargs))
+        errors.extend(self._check_max_length_attribute(**kwargs))
         return errors
 
-    def _check_max_length_attibute(self, **kwargs):
+    def _check_max_length_attribute(self, **kwargs):
         try:
             max_length = int(self.max_length)
             if max_length <= 0:
@@ -1850,7 +1850,10 @@ class TextField(Field):
         return smart_text(value)
 
     def formfield(self, **kwargs):
-        defaults = {'widget': forms.Textarea}
+        # Passing max_length to forms.CharField means that the value's length
+        # will be validated twice. This is considered acceptable since we want
+        # the value in the form field (to pass into widget for example).
+        defaults = {'max_length': self.max_length, 'widget': forms.Textarea}
         defaults.update(kwargs)
         return super(TextField, self).formfield(**defaults)
 

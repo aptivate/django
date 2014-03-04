@@ -533,7 +533,7 @@ class TestFieldOverridesTroughFormMeta(TestCase):
         form = FieldOverridesTroughFormMetaForm()
         self.assertHTMLEqual(
             str(form['name']),
-            '<textarea id="id_name" rows="10" cols="40" name="name"></textarea>',
+            '<textarea id="id_name" rows="10" cols="40" name="name" maxlength="20" />',
         )
         self.assertHTMLEqual(
             str(form['url']),
